@@ -1,0 +1,5 @@
+flask
+requests
+beautifulsoup4
+# 可选：用于无头浏览器模式
+playwright

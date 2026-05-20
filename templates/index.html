@@ -1,0 +1,1679 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JSLeakHunter</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=JetBrains+Mono:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --font-display: 'KaiTi', 'STKaiti', '楷体', 'AR PL UKai CN', serif;
+  --font-mono: 'KaiTi', 'STKaiti', '楷体', 'AR PL UKai CN', monospace;
+  --radius: 8px;
+  --transition: 0.3s ease;
+}
+
+[data-theme="dark"] {
+  --bg: #060610;
+  --surface: #0c0c1e;
+  --card: #0e0e28;
+  --card-hover: #14143a;
+  --border: #1a1a45;
+  --border-light: #252560;
+  --accent: #00d4ff;
+  --accent-2: #00ff88;
+  --accent-glow: rgba(0,212,255,0.15);
+  --danger: #ff1744;
+  --danger-dim: rgba(255,23,68,0.12);
+  --warn: #ffab00;
+  --warn-dim: rgba(255,171,0,0.12);
+  --info: #448aff;
+  --info-dim: rgba(68,138,255,0.12);
+  --success: #00e676;
+  --success-dim: rgba(0,230,118,0.12);
+  --text: #b8b8d0;
+  --text-bright: #e0e0ff;
+  --muted: #3e3e6a;
+  --input-bg: #060610;
+  --term-bg: #030308;
+  --stat-bg: #060610;
+  --overlay: rgba(0,0,0,0.85);
+  --grid-opacity: 0.012;
+  --radial-1: rgba(0,40,80,0.4);
+  --radial-2: rgba(40,0,60,0.3);
+  --radial-3: rgba(0,20,40,0.2);
+}
+
+[data-theme="light"] {
+  --bg: #f0f2f5;
+  --surface: #ffffff;
+  --card: #ffffff;
+  --card-hover: #f5f7fa;
+  --border: #dde1e8;
+  --border-light: #c0c8d4;
+  --accent: #0077cc;
+  --accent-2: #00a854;
+  --accent-glow: rgba(0,119,204,0.1);
+  --danger: #e53935;
+  --danger-dim: rgba(229,57,53,0.08);
+  --warn: #f57c00;
+  --warn-dim: rgba(245,124,0,0.08);
+  --info: #1976d2;
+  --info-dim: rgba(25,118,210,0.08);
+  --success: #2e7d32;
+  --success-dim: rgba(46,125,50,0.08);
+  --text: #4a4a5a;
+  --text-bright: #1a1a2e;
+  --muted: #6a6a80;
+  --input-bg: #f5f7fa;
+  --term-bg: #f5f6f8;
+  --stat-bg: #f5f7fa;
+  --overlay: rgba(0,0,0,0.4);
+  --grid-opacity: 0;
+  --radial-1: transparent;
+  --radial-2: transparent;
+  --radial-3: transparent;
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.6;
+  min-height: 100vh;
+  transition: background var(--transition), color var(--transition);
+}
+
+.container { max-width: 1280px; margin: 0 auto; padding: 30px 24px; }
+
+.header {
+  text-align: center;
+  margin-bottom: 36px;
+  animation: fadeDown 0.6s ease;
+  position: relative;
+}
+
+.header h1 {
+  font-family: var(--font-display);
+  font-size: 36px;
+  font-weight: 900;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  letter-spacing: 6px;
+  margin-bottom: 4px;
+}
+
+.header .subtitle { color: var(--muted); font-size: 11px; letter-spacing: 3px; text-transform: uppercase; }
+.header .version {
+  display: inline-block; margin-left: 12px; padding: 1px 8px;
+  border: 1px solid var(--accent); border-radius: 3px;
+  color: var(--accent); font-size: 9px; letter-spacing: 2px; vertical-align: middle;
+}
+
+.toolbar { position: absolute; top: 0; right: 0; display: flex; gap: 8px; align-items: center; }
+
+.toolbar-btn {
+  background: var(--card); border: 1px solid var(--border); border-radius: 4px;
+  color: var(--muted); font-family: var(--font-mono); font-size: 10px;
+  padding: 6px 12px; cursor: pointer; transition: all 0.2s;
+  letter-spacing: 1px; display: flex; align-items: center; gap: 6px;
+}
+.toolbar-btn:hover { border-color: var(--accent); color: var(--accent); }
+.toolbar-btn .icon { font-size: 14px; line-height: 1; }
+
+.card {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 24px; margin-bottom: 20px;
+  transition: border-color var(--transition), box-shadow var(--transition), background var(--transition);
+}
+.card:hover { border-color: var(--border-light); }
+
+.card-title {
+  font-family: var(--font-display); font-size: 10px; letter-spacing: 4px;
+  color: var(--accent); text-transform: uppercase; margin-bottom: 20px;
+  display: flex; align-items: center; gap: 10px;
+}
+.card-title::before { content: ''; display: inline-block; width: 3px; height: 14px; background: var(--accent); border-radius: 2px; }
+
+.tabs { display: flex; gap: 0; margin-bottom: 24px; border-bottom: 1px solid var(--border); }
+.tab {
+  padding: 12px 24px; font-family: var(--font-mono); font-size: 11px; letter-spacing: 2px;
+  color: var(--muted); background: transparent; border: none; border-bottom: 2px solid transparent;
+  cursor: pointer; text-transform: uppercase; transition: all 0.3s;
+}
+.tab:hover { color: var(--text); }
+.tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+
+.form-grid { display: grid; gap: 14px; }
+.form-row { display: grid; grid-template-columns: 140px 1fr; align-items: center; gap: 12px; }
+.form-row label { font-size: 10px; color: var(--muted); letter-spacing: 1.5px; text-transform: uppercase; }
+
+input, select, textarea {
+  background: var(--input-bg); border: 1px solid var(--border); border-radius: 4px;
+  color: var(--text-bright); font-family: var(--font-mono); font-size: 13px;
+  padding: 10px 14px; outline: none; width: 100%;
+  transition: border-color 0.3s, box-shadow 0.3s, background var(--transition), color var(--transition);
+}
+input:focus, select:focus, textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
+input::placeholder { color: var(--muted); }
+input[type="password"] { letter-spacing: 3px; }
+textarea { resize: vertical; min-height: 60px; }
+.hint { font-size: 10px; color: var(--muted); margin-top: 4px; grid-column: 2; }
+
+.scan-mode-toggle {
+  display: flex;
+  background: var(--input-bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+.scan-mode-btn {
+  flex: 1;
+  padding: 12px 16px;
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 1px;
+  cursor: pointer;
+  transition: all 0.3s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.scan-mode-btn:hover { color: var(--text); background: var(--card-hover); }
+.scan-mode-btn.active {
+  color: var(--accent);
+  background: var(--accent-glow);
+  border-bottom: 2px solid var(--accent);
+}
+.scan-mode-btn .mode-icon { font-size: 16px; }
+
+.toggle-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.toggle-switch {
+  position: relative;
+  width: 40px;
+  height: 20px;
+  background: var(--border);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.3s;
+}
+.toggle-switch.active { background: var(--accent); }
+.toggle-switch::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  background: var(--text-bright);
+  border-radius: 50%;
+  transition: transform 0.3s;
+}
+.toggle-switch.active::after { transform: translateX(20px); }
+.toggle-label { font-size: 11px; color: var(--muted); }
+
+.advanced-toggle {
+  display: flex; align-items: center; gap: 8px; cursor: pointer;
+  color: var(--muted); font-size: 10px; letter-spacing: 1.5px;
+  margin-top: 8px; user-select: none; transition: color 0.2s;
+}
+.advanced-toggle:hover { color: var(--text); }
+.advanced-toggle .arrow { transition: transform 0.3s; font-size: 8px; }
+.advanced-toggle.open .arrow { transform: rotate(90deg); }
+.advanced-body { max-height: 0; overflow: hidden; transition: max-height 0.5s ease; }
+.advanced-body.show { max-height: 600px; }
+
+.btn-scan, .btn-extract {
+  display: block; width: 100%; padding: 16px; margin-top: 20px;
+  background: transparent; border: 2px solid var(--accent); border-radius: 6px;
+  color: var(--accent); font-family: var(--font-display); font-size: 14px;
+  letter-spacing: 5px; cursor: pointer; transition: all 0.3s;
+  text-transform: uppercase; position: relative; overflow: hidden;
+}
+.btn-scan::before, .btn-extract::before {
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  opacity: 0; transition: opacity 0.3s;
+}
+.btn-scan:hover::before, .btn-extract:hover::before { opacity: 1; }
+.btn-scan:hover, .btn-extract:hover { color: var(--bg); }
+.btn-scan span, .btn-extract span { position: relative; z-index: 1; }
+.btn-scan:disabled, .btn-extract:disabled { opacity: 0.2; cursor: not-allowed; border-color: var(--muted); color: var(--muted); }
+
+.extract-section { display: none; }
+.extract-section.active { display: block; animation: fadeUp 0.4s ease; }
+
+.extract-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+.extract-stats {
+  display: flex;
+  gap: 16px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.extract-stats span { display: flex; align-items: center; gap: 4px; }
+.extract-stats .count { color: var(--accent); font-weight: 700; }
+
+.extract-actions {
+  display: flex;
+  gap: 10px;
+}
+.btn-select-all, .btn-deselect-all {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  padding: 6px 14px;
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+  letter-spacing: 1px;
+}
+.btn-select-all:hover, .btn-deselect-all:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.js-file-list {
+  max-height: 400px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--term-bg);
+}
+
+.js-file-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  transition: background 0.2s;
+  cursor: pointer;
+}
+.js-file-item:last-child { border-bottom: none; }
+.js-file-item:hover { background: var(--card-hover); }
+.js-file-item.selected { background: var(--accent-glow); }
+
+.js-file-checkbox {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.js-file-info { flex: 1; min-width: 0; }
+.js-file-url {
+  font-size: 12px;
+  color: var(--text-bright);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.js-file-meta {
+  font-size: 10px;
+  color: var(--muted);
+  margin-top: 2px;
+  display: flex;
+  gap: 12px;
+}
+
+.source-badge {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 3px;
+  font-size: 9px;
+  letter-spacing: 1px;
+}
+.source-badge.script_tag { background: var(--info-dim); color: var(--info); }
+.source-badge.dynamic { background: var(--warn-dim); color: var(--warn); }
+.source-badge.import { background: var(--success-dim); color: var(--success); }
+.source-badge.preload { background: var(--accent-glow); color: var(--accent); }
+.source-badge.other { background: var(--danger-dim); color: var(--danger); }
+
+.btn-scan-selected {
+  display: block;
+  width: 100%;
+  padding: 14px;
+  margin-top: 16px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  border: none;
+  border-radius: 6px;
+  color: var(--bg);
+  font-family: var(--font-display);
+  font-size: 13px;
+  letter-spacing: 4px;
+  cursor: pointer;
+  transition: all 0.3s;
+  text-transform: uppercase;
+}
+.btn-scan-selected:hover { opacity: 0.9; transform: translateY(-1px); }
+.btn-scan-selected:disabled { opacity: 0.3; cursor: not-allowed; transform: none; }
+
+.progress-section { display: none; }
+.progress-section.active { display: block; animation: fadeUp 0.4s ease; }
+
+.progress-track { background: var(--input-bg); border-radius: 4px; height: 4px; overflow: hidden; margin-bottom: 10px; border: 1px solid var(--border); }
+.progress-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent-2)); border-radius: 4px; width: 0%; transition: width 0.4s ease; box-shadow: 0 0 10px var(--accent-glow); }
+.progress-meta { display: flex; justify-content: space-between; font-size: 10px; color: var(--muted); margin-bottom: 16px; letter-spacing: 1px; }
+
+.terminal {
+  background: var(--term-bg); border: 1px solid var(--border); border-radius: 6px;
+  padding: 16px; max-height: 320px; overflow-y: auto; font-size: 11.5px; line-height: 1.9;
+  transition: background var(--transition);
+}
+
+.log-line { opacity: 0; animation: fadeIn 0.2s ease forwards; white-space: pre-wrap; word-break: break-all; }
+.log-line .ts { color: var(--muted); }
+.log-line.info { color: var(--text); }
+.log-line.success { color: var(--success); }
+.log-line.warn { color: var(--warn); }
+.log-line.error { color: var(--danger); }
+.log-line.ai { color: var(--accent); }
+
+.stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 24px; }
+
+.stat-card {
+  background: var(--stat-bg); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 20px; text-align: center; position: relative; overflow: hidden;
+  transition: transform 0.3s, border-color 0.3s, box-shadow 0.3s, background var(--transition);
+}
+.stat-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; }
+.stat-card:hover { transform: translateY(-3px); }
+.stat-card.high::before { background: var(--danger); }
+.stat-card.high:hover { border-color: var(--danger); box-shadow: 0 4px 20px var(--danger-dim); }
+.stat-card.medium::before { background: var(--warn); }
+.stat-card.medium:hover { border-color: var(--warn); box-shadow: 0 4px 20px var(--warn-dim); }
+.stat-card.low::before { background: var(--info); }
+.stat-card.low:hover { border-color: var(--info); box-shadow: 0 4px 20px var(--info-dim); }
+.stat-card.total::before { background: var(--accent); }
+.stat-card.total:hover { border-color: var(--accent); box-shadow: 0 4px 20px var(--accent-glow); }
+
+.stat-number { font-family: var(--font-display); font-size: 36px; font-weight: 900; line-height: 1; margin-bottom: 4px; }
+.stat-card.high .stat-number { color: var(--danger); }
+.stat-card.medium .stat-number { color: var(--warn); }
+.stat-card.low .stat-number { color: var(--info); }
+.stat-card.total .stat-number { color: var(--accent); }
+.stat-label { font-size: 9px; color: var(--muted); letter-spacing: 3px; text-transform: uppercase; }
+
+.filters { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; }
+.filter-btn {
+  background: var(--input-bg); border: 1px solid var(--border); border-radius: 4px;
+  color: var(--muted); font-family: var(--font-mono); font-size: 10px;
+  padding: 6px 14px; cursor: pointer; transition: all 0.2s; letter-spacing: 1.5px;
+}
+.filter-btn:hover { border-color: var(--text); color: var(--text); }
+.filter-btn.active { border-color: var(--accent); color: var(--accent); background: var(--accent-glow); }
+.filter-search { margin-left: auto; width: 200px; padding: 6px 12px; font-size: 11px; }
+
+.table-wrap { overflow-x: auto; }
+table.findings { width: 100%; border-collapse: collapse; }
+table.findings th {
+  text-align: left; padding: 10px 12px; font-size: 9px; letter-spacing: 2px;
+  color: var(--muted); text-transform: uppercase; border-bottom: 2px solid var(--border); white-space: nowrap;
+}
+table.findings td { padding: 10px 12px; border-bottom: 1px solid var(--border); font-size: 12px; vertical-align: top; }
+table.findings tbody tr { cursor: pointer; transition: background 0.2s; }
+table.findings tbody tr:hover { background: var(--card-hover); }
+
+.badge { display: inline-block; padding: 2px 10px; border-radius: 3px; font-size: 9px; font-weight: 700; letter-spacing: 1px; }
+.badge.high { background: var(--danger-dim); color: var(--danger); border: 1px solid rgba(255,23,68,0.3); }
+.badge.medium { background: var(--warn-dim); color: var(--warn); border: 1px solid rgba(255,171,0,0.3); }
+.badge.low { background: var(--info-dim); color: var(--info); border: 1px solid rgba(68,138,255,0.3); }
+
+.evidence-cell { max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; color: var(--muted); }
+.file-cell { max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; color: var(--text); }
+
+.source-tag { font-size: 9px; padding: 1px 6px; border-radius: 2px; letter-spacing: 1px; }
+.source-tag.regex { background: var(--warn-dim); color: var(--warn); }
+.source-tag.ai { background: var(--accent-glow); color: var(--accent); }
+
+.export-bar { display: flex; gap: 10px; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border); }
+.btn-export {
+  background: transparent; border: 1px solid var(--border); border-radius: 4px;
+  color: var(--muted); font-family: var(--font-mono); font-size: 10px;
+  padding: 8px 16px; cursor: pointer; transition: all 0.2s; letter-spacing: 1.5px; text-transform: uppercase;
+}
+.btn-export:hover { border-color: var(--accent); color: var(--accent); }
+
+.history-item {
+  display: grid; grid-template-columns: auto 1fr auto auto auto auto; gap: 16px; align-items: center;
+  padding: 14px 16px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.2s;
+}
+.history-item:hover { background: var(--card-hover); }
+.history-checkbox {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+.history-target { font-weight: 500; color: var(--text-bright); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.history-date { font-size: 10px; color: var(--muted); }
+.history-findings { display: flex; gap: 6px; }
+.history-dot { width: 8px; height: 8px; border-radius: 50%; }
+.history-dot.high { background: var(--danger); }
+.history-dot.medium { background: var(--warn); }
+.history-dot.low { background: var(--info); }
+.history-status { font-size: 9px; letter-spacing: 1px; text-transform: uppercase; }
+.history-status.completed { color: var(--success); }
+.history-status.running { color: var(--accent); }
+.btn-delete {
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--muted);
+    padding: 4px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    transition: all 0.2s;
+    opacity: 0;
+}
+.history-item:hover .btn-delete {
+    opacity: 1;
+}
+.btn-delete:hover {
+    border-color: var(--danger);
+    color: var(--danger);
+    background: var(--danger-dim);
+}
+
+.batch-delete-bar {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 16px;
+  padding: 12px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  align-items: center;
+  justify-content: space-between;
+}
+.batch-delete-bar.hidden { display: none; }
+.batch-delete-btn {
+  background: var(--danger);
+  border: none;
+  color: white;
+  padding: 8px 16px;
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.batch-delete-btn:hover { opacity: 0.8; }
+.batch-delete-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+.empty-state { text-align: center; padding: 60px 20px; color: var(--muted); }
+.empty-state .icon { font-size: 56px; margin-bottom: 16px; opacity: 0.15; }
+.empty-state p { font-size: 12px; }
+
+.modal-overlay {
+  display: none; position: fixed; inset: 0; background: var(--overlay);
+  z-index: 100; align-items: center; justify-content: center; backdrop-filter: blur(4px);
+}
+.modal-overlay.show { display: flex; }
+
+.modal-box {
+  background: var(--card); border: 1px solid var(--accent); border-radius: 10px;
+  padding: 30px; max-width: 720px; width: 92%; max-height: 85vh; overflow-y: auto;
+  animation: modalIn 0.3s ease; transition: background var(--transition);
+}
+.modal-box h3 { font-family: var(--font-display); color: var(--accent); font-size: 13px; letter-spacing: 2px; margin-bottom: 20px; }
+.modal-row { display: flex; gap: 12px; margin-bottom: 12px; align-items: flex-start; }
+.modal-label { font-size: 10px; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; min-width: 100px; padding-top: 2px; }
+.modal-value { flex: 1; color: var(--text-bright); font-size: 12px; word-break: break-all; }
+.modal-value code { background: var(--input-bg); padding: 2px 8px; border-radius: 3px; color: var(--accent); }
+.modal-value pre {
+  background: var(--term-bg); padding: 14px; border-radius: 6px; overflow-x: auto;
+  font-size: 11px; line-height: 1.7; white-space: pre-wrap; word-break: break-all;
+  margin-top: 4px; transition: background var(--transition);
+}
+
+.btn-close-modal {
+  display: block; margin-top: 20px; background: transparent; border: 1px solid var(--border);
+  color: var(--text); padding: 10px 24px; border-radius: 4px; cursor: pointer;
+  font-family: var(--font-mono); font-size: 11px; letter-spacing: 2px; text-transform: uppercase; transition: all 0.2s;
+}
+.btn-close-modal:hover { border-color: var(--accent); color: var(--accent); }
+
+.spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
+@keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
+@keyframes fadeDown { from { opacity:0; transform:translateY(-12px); } to { opacity:1; transform:translateY(0); } }
+@keyframes modalIn { from { opacity:0; transform:scale(0.95) translateY(10px); } to { opacity:1; transform:scale(1) translateY(0); } }
+@keyframes pulse { 0%,100%{ box-shadow:0 0 0 0 var(--accent-glow); } 50%{ box-shadow:0 0 24px 6px var(--accent-glow); } }
+.scanning .btn-scan { animation: pulse 2s infinite; }
+
+@media (max-width: 768px) {
+  .form-row { grid-template-columns: 1fr; }
+  .stats-grid { grid-template-columns: repeat(2, 1fr); }
+  .header h1 { font-size: 22px; }
+  .history-item { grid-template-columns: 1fr auto; }
+  .toolbar { position: static; justify-content: center; margin-bottom: 16px; }
+  .extract-header { flex-direction: column; gap: 12px; align-items: flex-start; }
+  .history-item .history-checkbox { opacity: 1; }
+}
+</style>
+</head>
+<body data-theme="dark">
+
+<div class="container">
+  <div class="header">
+    <div class="toolbar">
+      <button class="toolbar-btn" onclick="toggleTheme()" id="themeBtn">
+        <span class="icon" id="themeIcon">&#9790;</span>
+        <span id="themeLabel">Light</span>
+      </button>
+      <button class="toolbar-btn" onclick="toggleLang()" id="langBtn">
+        <span class="icon">&#127760;</span>
+        <span id="langLabel">EN</span>
+      </button>
+    </div>
+    <h1>JSLeakHunter</h1>
+    <div class="subtitle" data-i18n="subtitle">
+      AI-Powered Frontend Hardcoded Leak Detection
+      <span class="version">v2.0</span>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('scan', this)" data-i18n="tab_scan">Scan</button>
+    <button class="tab" onclick="switchTab('history', this)" data-i18n="tab_history">History</button>
+  </div>
+
+  <div class="tab-content active" id="tab-scan">
+    <div class="card" id="configCard">
+      <div class="card-title" data-i18n="card_config">Scan Configuration</div>
+      
+      <div class="scan-mode-toggle">
+        <button class="scan-mode-btn active" id="modeDirect" onclick="setScanMode('direct')">
+          <span class="mode-icon">&#9889;</span>
+          <span data-i18n="mode_direct">Direct Scan</span>
+        </button>
+        <button class="scan-mode-btn" id="modeExtract" onclick="setScanMode('extract')">
+          <span class="mode-icon">&#128269;</span>
+          <span data-i18n="mode_extract">Extract & Select</span>
+        </button>
+      </div>
+
+      <div class="form-grid">
+        <div class="form-row">
+          <label data-i18n="label_target">Target URL</label>
+          <input type="text" id="targetUrl" placeholder="https://example.com" autocomplete="off">
+        </div>
+        <div class="form-row">
+          <label data-i18n="label_depth">Crawl Depth</label>
+          <select id="crawlDepth">
+            <option value="1" data-i18n="depth_1">1 — Single page</option>
+            <option value="2" selected data-i18n="depth_2">2 — Two levels deep</option>
+            <option value="3" data-i18n="depth_3">3 — Deep crawl</option>
+          </select>
+        </div>
+
+        <div class="advanced-toggle" id="advToggle" onclick="toggleAdvanced()">
+          <span class="arrow">&#9654;</span> <span data-i18n="advanced">Advanced Settings</span>
+        </div>
+
+        <div class="advanced-body" id="advBody">
+          <div class="form-grid" style="padding-top:14px; gap:14px;">
+            <div class="form-row">
+              <label>API URL</label>
+              <input type="text" id="apiUrl" value="https://token-plan-cn.xiaomimimo.com/v1">
+            </div>
+            <div class="form-row">
+              <label>API Key</label>
+              <input type="password" id="apiKey" placeholder="tp-xxxx...">
+            </div>
+            <div class="form-row">
+              <label>Model</label>
+              <input type="text" id="modelName" value="mimo-v2.5-pro">
+            </div>
+            <div class="form-row">
+              <label>Cookie</label>
+              <input type="text" id="scanCookie" placeholder="session=abc123; token=xyz...">
+            </div>
+            <p class="hint" data-i18n="hint_cookie">Cookie is used for authenticated scanning (login-protected pages)</p>
+            
+            <div class="form-row">
+              <label data-i18n="label_browser">Browser Mode</label>
+              <div class="toggle-wrapper">
+                <div class="toggle-switch" id="browserToggle" onclick="toggleBrowserMode()"></div>
+                <span class="toggle-label" data-i18n="browser_hint">Capture dynamic JS (requires Playwright)</span>
+              </div>
+            </div>
+            
+            <div class="form-row">
+              <label data-i18n="label_full_scan">Full Scan</label>
+              <div class="toggle-wrapper">
+                <div class="toggle-switch" id="fullScanToggle" onclick="toggleFullScan()"></div>
+                <span class="toggle-label" data-i18n="full_scan_hint">AI scans entire JS file (slower but more thorough)</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <button class="btn-scan" id="btnScan" onclick="startScan()"><span data-i18n="btn_scan">Start Scan</span></button>
+      
+      <button class="btn-extract" id="btnExtract" onclick="startExtract()" style="display:none">
+        <span data-i18n="btn_extract">Extract JS Files</span>
+      </button>
+    </div>
+
+    <div class="card extract-section" id="extractSection">
+      <div class="card-title" data-i18n="card_extract">Extracted JavaScript Files</div>
+      
+      <div class="extract-header">
+        <div class="extract-stats">
+          <span><span class="count" id="extractTotal">0</span> <span data-i18n="total_files">total files</span></span>
+          <span><span class="count" id="extractSelected">0</span> <span data-i18n="selected">selected</span></span>
+        </div>
+        <div class="extract-actions">
+          <button class="btn-select-all" onclick="selectAllFiles()" data-i18n="select_all">Select All</button>
+          <button class="btn-deselect-all" onclick="deselectAllFiles()" data-i18n="deselect_all">Deselect All</button>
+        </div>
+      </div>
+      
+      <div class="js-file-list" id="jsFileList"></div>
+      
+      <button class="btn-scan-selected" id="btnScanSelected" onclick="scanSelectedFiles()" disabled>
+        <span data-i18n="btn_scan_selected">Scan Selected Files</span>
+      </button>
+    </div>
+
+    <div class="card progress-section" id="progressSection">
+      <div class="card-title" data-i18n="card_scanning">Scanning</div>
+      <div class="progress-track"><div class="progress-fill" id="progressBar"></div></div>
+      <div class="progress-meta">
+        <span id="progressPct">0%</span>
+        <span id="progressDetail" data-i18n="initializing">Initializing...</span>
+      </div>
+      <div class="terminal" id="terminal"></div>
+    </div>
+
+    <div class="card" id="resultsSection" style="display:none">
+      <div class="card-title" data-i18n="card_results">Results</div>
+      <div class="stats-grid">
+        <div class="stat-card high"><div class="stat-number" id="sHigh">0</div><div class="stat-label" data-i18n="stat_high">High</div></div>
+        <div class="stat-card medium"><div class="stat-number" id="sMed">0</div><div class="stat-label" data-i18n="stat_medium">Medium</div></div>
+        <div class="stat-card low"><div class="stat-number" id="sLow">0</div><div class="stat-label" data-i18n="stat_low">Low</div></div>
+        <div class="stat-card total"><div class="stat-number" id="sTotal">0</div><div class="stat-label" data-i18n="stat_total">Total</div></div>
+      </div>
+      <div class="filters">
+        <button class="filter-btn active" onclick="setFilter('all',this)" data-i18n="filter_all">ALL</button>
+        <button class="filter-btn" onclick="setFilter('HIGH',this)">HIGH</button>
+        <button class="filter-btn" onclick="setFilter('MEDIUM',this)">MEDIUM</button>
+        <button class="filter-btn" onclick="setFilter('LOW',this)">LOW</button>
+        <input type="text" class="filter-search" data-i18n-placeholder="search" placeholder="Search..." oninput="setSearch(this.value)">
+      </div>
+      <div class="table-wrap">
+        <table class="findings">
+          <thead>
+            <tr>
+              <th>#</th><th data-i18n="th_severity">Severity</th><th data-i18n="th_type">Type</th>
+              <th data-i18n="th_file">File</th><th data-i18n="th_line">Line</th>
+              <th data-i18n="th_evidence">Evidence</th><th data-i18n="th_source">Source</th>
+            </tr>
+          </thead>
+          <tbody id="findingsBody"></tbody>
+        </table>
+      </div>
+      <div class="export-bar">
+        <button class="btn-export" onclick="doExport('json')">JSON</button>
+        <button class="btn-export" onclick="doExport('csv')">CSV</button>
+        <button class="btn-export" onclick="doExport('markdown')">Markdown</button>
+      </div>
+    </div>
+
+    <div class="card" id="emptyState">
+      <div class="empty-state">
+        <div class="icon">&#128269;</div>
+        <p data-i18n="empty_main">Enter a target URL to begin scanning</p>
+        <p style="margin-top:6px; font-size:10px; opacity:0.5;" data-i18n="empty_sub">Regex pre-check + AI deep analysis · Supports batch targets · Authenticated scanning</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="tab-content" id="tab-history">
+    <div class="card">
+      <div class="card-title" data-i18n="card_history">Scan History</div>
+      
+      <!-- Batch Delete Bar -->
+      <div class="batch-delete-bar hidden" id="batchDeleteBar">
+        <span><span id="selectedCount">0</span> <span data-i18n="selected">selected</span></span>
+        <div>
+          <button class="btn-export" onclick="selectAllHistory()" data-i18n="select_all">Select All</button>
+          <button class="btn-export" onclick="deselectAllHistory()" data-i18n="deselect_all">Deselect All</button>
+          <button class="batch-delete-btn" onclick="batchDeleteSelected()" data-i18n="batch_delete">Delete Selected</button>
+        </div>
+      </div>
+      
+      <div id="historyList">
+        <div class="empty-state"><p data-i18n="empty_history">No scan history yet</p></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="detailModal">
+  <div class="modal-box">
+    <h3 id="modalTitle">Finding Details</h3>
+    <div id="modalBody"></div>
+    <button class="btn-close-modal" onclick="closeModal()" data-i18n="btn_close">Close</button>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// i18n
+// ============================================================
+const I18N = {
+  zh: {
+    subtitle: 'AI 驱动的前端硬编码泄露检测',
+    tab_scan: '扫描', tab_history: '历史', card_config: '扫描配置',
+    label_target: '目标 URL', label_depth: '爬取深度',
+    depth_1: '1 — 单页面', depth_2: '2 — 两层深度（推荐）', depth_3: '3 — 深度爬取',
+    advanced: '高级设置', hint_cookie: 'Cookie 用于认证扫描（需要登录的页面）',
+    label_browser: '浏览器模式', browser_hint: '捕获动态加载的JS（需要安装 Playwright）',
+    label_full_scan: '全面扫描', full_scan_hint: 'AI扫描整个JS文件（耗时更长，但更全面）',
+    mode_direct: '直接扫描', mode_extract: '提取预览',
+    btn_scan: '开始扫描', btn_extract: '提取 JS 文件',
+    card_extract: '已提取的 JavaScript 文件',
+    total_files: '个文件', selected: '个已选',
+    select_all: '全选', deselect_all: '取消全选',
+    btn_scan_selected: '扫描选中文件',
+    card_scanning: '扫描中', initializing: '初始化中...',
+    card_results: '扫描结果', stat_high: '高危', stat_medium: '中危', stat_low: '低危', stat_total: '总计',
+    filter_all: '全部', search: '搜索...',
+    th_severity: '等级', th_type: '类型', th_file: '文件', th_line: '行号', th_evidence: '证据', th_source: '来源',
+    card_history: '扫描历史', empty_main: '输入目标 URL 开始扫描',
+    empty_sub: '正则预检 + AI 深度分析 · 支持批量目标 · 支持认证扫描',
+    empty_history: '暂无扫描历史', btn_close: '关闭', detail_title: '发现详情',
+    modal_severity: '等级', modal_file: '文件', modal_line: '行号', modal_source: '来源',
+    modal_evidence: '证据', modal_impact: '影响', modal_fix: '修复建议',
+    modal_na: '暂无', modal_manual: '需要人工确认',
+    no_findings: '未发现泄露', no_match: '无匹配结果',
+    connected: '已连接', models: '个模型', skipped: '跳过',
+    regex_hit: '正则匹配', ai_analyzing: 'AI 分析中...', ai_found: 'AI 发现',
+    issues: '个问题', scan_done: '扫描完成',
+    target_required: '请输入目标 URL', connection_failed: '连接失败',
+    scan_not_found: '扫描未找到', scan_failed: '扫描失败',
+    extracting: '正在提取 JS 文件...', extract_done: '提取完成',
+    source_script_tag: 'Script 标签', source_dynamic: '动态加载', source_import: 'Import',
+    source_preload: '预加载', source_other: '其他',
+    batch_delete: '批量删除', batch_delete_confirm: '确定删除选中的 {count} 条记录？',
+  },
+  en: {
+    subtitle: 'AI-Powered Frontend Hardcoded Leak Detection',
+    tab_scan: 'Scan', tab_history: 'History', card_config: 'Scan Configuration',
+    label_target: 'Target URL', label_depth: 'Crawl Depth',
+    depth_1: '1 — Single page', depth_2: '2 — Two levels deep', depth_3: '3 — Deep crawl',
+    advanced: 'Advanced Settings', hint_cookie: 'Cookie is used for authenticated scanning (login-protected pages)',
+    label_browser: 'Browser Mode', browser_hint: 'Capture dynamic JS (requires Playwright)',
+    label_full_scan: 'Full Scan', full_scan_hint: 'AI scans entire JS file (slower but more thorough)',
+    mode_direct: 'Direct Scan', mode_extract: 'Extract & Select',
+    btn_scan: 'Start Scan', btn_extract: 'Extract JS Files',
+    card_extract: 'Extracted JavaScript Files',
+    total_files: 'total files', selected: 'selected',
+    select_all: 'Select All', deselect_all: 'Deselect All',
+    btn_scan_selected: 'Scan Selected Files',
+    card_scanning: 'Scanning', initializing: 'Initializing...',
+    card_results: 'Results', stat_high: 'High', stat_medium: 'Medium', stat_low: 'Low', stat_total: 'Total',
+    filter_all: 'ALL', search: 'Search...',
+    th_severity: 'Severity', th_type: 'Type', th_file: 'File', th_line: 'Line', th_evidence: 'Evidence', th_source: 'Source',
+    card_history: 'Scan History', empty_main: 'Enter a target URL to begin scanning',
+    empty_sub: 'Regex pre-check + AI deep analysis · Supports batch targets · Authenticated scanning',
+    empty_history: 'No scan history yet', btn_close: 'Close', detail_title: 'Finding Details',
+    modal_severity: 'Severity', modal_file: 'File', modal_line: 'Line', modal_source: 'Source',
+    modal_evidence: 'Evidence', modal_impact: 'Impact', modal_fix: 'Fix',
+    modal_na: 'N/A', modal_manual: 'Manual review required',
+    no_findings: 'No leaks found', no_match: 'No findings match',
+    connected: 'Connected', models: 'models', skipped: 'Skipped',
+    regex_hit: 'Regex', ai_analyzing: 'AI analyzing...', ai_found: 'AI found',
+    issues: 'issues', scan_done: 'Scan complete',
+    target_required: 'Please enter a target URL', connection_failed: 'Connection failed',
+    scan_not_found: 'Scan not found', scan_failed: 'Scan failed',
+    extracting: 'Extracting JS files...', extract_done: 'Extraction complete',
+    source_script_tag: 'Script Tag', source_dynamic: 'Dynamic', source_import: 'Import',
+    source_preload: 'Preload', source_other: 'Other',
+    batch_delete: 'Batch Delete', batch_delete_confirm: 'Delete {count} selected records?',
+  }
+};
+
+let currentLang = 'zh';
+function t(key) { return I18N[currentLang][key] || key; }
+
+function applyLang() {
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.getAttribute('data-i18n');
+    if (I18N[currentLang][key] !== undefined) {
+      if (key === 'subtitle') {
+        const versionSpan = el.querySelector('.version');
+        if (versionSpan) {
+          const versionHTML = versionSpan.outerHTML;
+          el.innerHTML = I18N[currentLang].subtitle + '\n          ' + versionHTML;
+        } else {
+          el.textContent = I18N[currentLang][key];
+        }
+      } else {
+        el.textContent = I18N[currentLang][key];
+      }
+    }
+  });
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+    const key = el.getAttribute('data-i18n-placeholder');
+    if (I18N[currentLang][key] !== undefined) el.placeholder = I18N[currentLang][key];
+  });
+  document.getElementById('langLabel').textContent = currentLang === 'zh' ? 'EN' : '中文';
+  document.documentElement.lang = currentLang === 'zh' ? 'zh-CN' : 'en';
+}
+
+function toggleLang() {
+  currentLang = currentLang === 'zh' ? 'en' : 'zh';
+  localStorage.setItem('jlh_lang', currentLang);
+  applyLang();
+}
+
+// ============================================================
+// Theme
+// ============================================================
+function toggleTheme() {
+  const current = document.body.getAttribute('data-theme');
+  const next = current === 'dark' ? 'light' : 'dark';
+  document.body.setAttribute('data-theme', next);
+  localStorage.setItem('jlh_theme', next);
+  updateThemeBtn(next);
+}
+
+function updateThemeBtn(theme) {
+  const icon = document.getElementById('themeIcon');
+  const label = document.getElementById('themeLabel');
+  if (theme === 'dark') { 
+    icon.innerHTML = '&#9789;';
+    label.textContent = 'Light';
+  } else { 
+    icon.innerHTML = '&#9728;';
+    label.textContent = 'Dark';
+  }
+}
+
+// ============================================================
+// Settings Persistence
+// ============================================================
+const SETTINGS_KEY = 'jlh_settings';
+
+function saveSettings() {
+  const settings = {
+    apiUrl: document.getElementById('apiUrl').value,
+    apiKey: document.getElementById('apiKey').value,
+    model: document.getElementById('modelName').value,
+    cookie: document.getElementById('scanCookie').value,
+    depth: document.getElementById('crawlDepth').value,
+    useBrowser: useBrowserMode,
+    fullScan: fullScanMode,
+    scanMode: currentScanMode,
+  };
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+}
+
+function restoreSettings() {
+  try {
+    const raw = localStorage.getItem(SETTINGS_KEY);
+    if (!raw) return;
+    const s = JSON.parse(raw);
+    if (s.apiUrl) document.getElementById('apiUrl').value = s.apiUrl;
+    if (s.apiKey) document.getElementById('apiKey').value = s.apiKey;
+    if (s.model) document.getElementById('modelName').value = s.model;
+    if (s.cookie) document.getElementById('scanCookie').value = s.cookie;
+    if (s.depth) document.getElementById('crawlDepth').value = s.depth;
+    if (s.useBrowser) {
+      useBrowserMode = true;
+      document.getElementById('browserToggle').classList.add('active');
+    }
+    if (s.fullScan) {
+      fullScanMode = true;
+      document.getElementById('fullScanToggle').classList.add('active');
+    }
+    if (s.scanMode) {
+      setScanMode(s.scanMode);
+    }
+    if (s.apiKey || s.cookie || s.useBrowser || s.fullScan) {
+      document.getElementById('advToggle').classList.add('open');
+      document.getElementById('advBody').classList.add('show');
+    }
+  } catch(e) {}
+}
+
+// ============================================================
+// Init
+// ============================================================
+(function init() {
+  const savedTheme = localStorage.getItem('jlh_theme') || 'dark';
+  document.body.setAttribute('data-theme', savedTheme);
+  updateThemeBtn(savedTheme);
+
+  const savedLang = localStorage.getItem('jlh_lang');
+  if (savedLang && I18N[savedLang]) currentLang = savedLang;
+  applyLang();
+
+  restoreSettings();
+
+  ['apiUrl', 'apiKey', 'modelName', 'scanCookie', 'crawlDepth'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.addEventListener('change', saveSettings);
+      el.addEventListener('input', saveSettings);
+    }
+  });
+})();
+
+// ============================================================
+// State
+// ============================================================
+let currentScanId = null;
+let allFindings = [];
+let displayedFindings = [];
+let currentFilter = 'all';
+let searchTerm = '';
+let currentScanMode = 'direct';
+let useBrowserMode = false;
+let fullScanMode = false;
+let extractedFiles = [];
+let selectedHistoryIds = new Set();
+
+// ============================================================
+// Scan Mode
+// ============================================================
+function setScanMode(mode) {
+  currentScanMode = mode;
+  saveSettings();
+  
+  document.getElementById('modeDirect').classList.toggle('active', mode === 'direct');
+  document.getElementById('modeExtract').classList.toggle('active', mode === 'extract');
+  
+  document.getElementById('btnScan').style.display = mode === 'direct' ? 'block' : 'none';
+  document.getElementById('btnExtract').style.display = mode === 'extract' ? 'block' : 'none';
+  
+  if (mode === 'direct') {
+    document.getElementById('extractSection').classList.remove('active');
+  }
+}
+
+function toggleBrowserMode() {
+  useBrowserMode = !useBrowserMode;
+  document.getElementById('browserToggle').classList.toggle('active', useBrowserMode);
+  saveSettings();
+}
+
+function toggleFullScan() {
+  fullScanMode = !fullScanMode;
+  document.getElementById('fullScanToggle').classList.toggle('active', fullScanMode);
+  saveSettings();
+}
+
+// ============================================================
+// Tabs
+// ============================================================
+function switchTab(name, btn) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('tab-' + name).classList.add('active');
+    if (name === 'history') loadHistory();
+    if (name === 'scan' && currentScanId) {
+        document.getElementById('progressSection').classList.add('active');
+    }
+}
+
+function deleteHistory(scanId, event) {
+    event.stopPropagation();
+    if (!confirm(currentLang === 'zh' ? '确定要删除这条记录吗？' : 'Delete this record?')) return;
+    
+    fetch('/api/scan/' + scanId + '/delete', { method: 'DELETE' })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                loadHistory();
+            }
+        });
+}
+
+function loadHistory() {
+    selectedHistoryIds.clear();
+    updateBatchDeleteUI();
+    
+    fetch('/api/history').then(r => r.json()).then(data => {
+        const list = document.getElementById('historyList');
+        if (!data.length) {
+            list.innerHTML = '<div class="empty-state"><p>' + t('empty_history') + '</p></div>';
+            document.getElementById('batchDeleteBar').classList.add('hidden');
+            return;
+        }
+        
+        document.getElementById('batchDeleteBar').classList.remove('hidden');
+        
+        list.innerHTML = data.map(h => `
+            <div class="history-item" id="history-item-${h.id}">
+                <input type="checkbox" class="history-checkbox" data-id="${h.id}" 
+                       onclick="event.stopPropagation(); toggleHistorySelect('${h.id}', this.checked)">
+                <div class="history-target" onclick="loadHistoryResults('${h.id}')">${esc(h.target)}</div>
+                <div class="history-findings" onclick="loadHistoryResults('${h.id}')">
+                    ${h.high ? '<div class="history-dot high" title="HIGH: ' + h.high + '"></div>' : ''}
+                    ${h.medium ? '<div class="history-dot medium" title="MEDIUM: ' + h.medium + '"></div>' : ''}
+                    ${h.low ? '<div class="history-dot low" title="LOW: ' + h.low + '"></div>' : ''}
+                </div>
+                <div class="history-status ${h.status}" onclick="loadHistoryResults('${h.id}')">${h.status}</div>
+                <div class="history-date" onclick="loadHistoryResults('${h.id}')">${h.started_at ? h.started_at.substring(5,16) : ''}</div>
+                <button class="btn-delete" onclick="deleteHistory('${h.id}', event)" title="${currentLang === 'zh' ? '删除' : 'Delete'}">✕</button>
+            </div>
+        `).join('');
+    });
+}
+
+// ============================================================
+// Batch Delete Functions
+// ============================================================
+function toggleHistorySelect(id, checked) {
+    if (checked) {
+        selectedHistoryIds.add(id);
+    } else {
+        selectedHistoryIds.delete(id);
+    }
+    updateBatchDeleteUI();
+}
+
+function selectAllHistory() {
+    document.querySelectorAll('.history-checkbox').forEach(cb => {
+        cb.checked = true;
+        selectedHistoryIds.add(cb.dataset.id);
+    });
+    updateBatchDeleteUI();
+}
+
+function deselectAllHistory() {
+    document.querySelectorAll('.history-checkbox').forEach(cb => {
+        cb.checked = false;
+    });
+    selectedHistoryIds.clear();
+    updateBatchDeleteUI();
+}
+
+function updateBatchDeleteUI() {
+    const count = selectedHistoryIds.size;
+    document.getElementById('selectedCount').textContent = count;
+    document.querySelector('.batch-delete-btn').disabled = count === 0;
+}
+
+function batchDeleteSelected() {
+    if (selectedHistoryIds.size === 0) return;
+    
+    const confirmMsg = t('batch_delete_confirm').replace('{count}', selectedHistoryIds.size);
+    if (!confirm(confirmMsg)) return;
+    
+    const ids = Array.from(selectedHistoryIds);
+    
+    fetch('/api/history/batch-delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scan_ids: ids })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            ids.forEach(id => {
+                const el = document.getElementById('history-item-' + id);
+                if (el) el.remove();
+            });
+            selectedHistoryIds.clear();
+            updateBatchDeleteUI();
+            
+            // 如果列表为空，显示空状态
+            const list = document.getElementById('historyList');
+            if (list.children.length === 0) {
+                list.innerHTML = '<div class="empty-state"><p>' + t('empty_history') + '</p></div>';
+                document.getElementById('batchDeleteBar').classList.add('hidden');
+            }
+        }
+    })
+    .catch(err => {
+        console.error('Batch delete failed:', err);
+    });
+}
+
+function loadHistoryResults(scanId) {
+    currentScanId = scanId;
+    fetch('/api/scan/' + scanId + '/results').then(r => r.json()).then(data => {
+        allFindings = data.findings || [];
+        document.getElementById('sHigh').textContent = data.high || 0;
+        document.getElementById('sMed').textContent = data.medium || 0;
+        document.getElementById('sLow').textContent = data.low || 0;
+        document.getElementById('sTotal').textContent = data.total || 0;
+        renderTable(allFindings);
+        document.getElementById('resultsSection').style.display = 'block';
+        document.getElementById('emptyState').style.display = 'none';
+        document.getElementById('progressSection').classList.remove('active');
+        document.getElementById('extractSection').classList.remove('active');
+        switchTab('scan', document.querySelectorAll('.tab')[0]);
+    });
+}
+
+// ============================================================
+// Advanced
+// ============================================================
+function toggleAdvanced() {
+  document.getElementById('advToggle').classList.toggle('open');
+  document.getElementById('advBody').classList.toggle('show');
+}
+
+// ============================================================
+// Extract JS Files
+// ============================================================
+function startExtract() {
+  const target = document.getElementById('targetUrl').value.trim();
+  if (!target) {
+    highlightError('targetUrl');
+    return;
+  }
+
+  saveSettings();
+  
+  const btn = document.getElementById('btnExtract');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> <span>' + t('extracting') + '</span>';
+
+  const config = {
+    target: target,
+    depth: parseInt(document.getElementById('crawlDepth').value),
+    cookie: document.getElementById('scanCookie').value.trim(),
+    use_browser: useBrowserMode,
+  };
+
+  fetch('/api/extract', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(config)
+  })
+  .then(r => r.json())
+  .then(data => {
+    btn.disabled = false;
+    btn.innerHTML = '<span>' + t('btn_extract') + '</span>';
+    
+    if (data.error) {
+      alert(data.error);
+      return;
+    }
+    
+    extractedFiles = data.js_files || [];
+    renderExtractedFiles(extractedFiles, data.stats);
+    document.getElementById('extractSection').classList.add('active');
+    document.getElementById('emptyState').style.display = 'none';
+  })
+  .catch(err => {
+    btn.disabled = false;
+    btn.innerHTML = '<span>' + t('btn_extract') + '</span>';
+    alert(t('connection_failed') + ': ' + err.message);
+  });
+}
+
+function renderExtractedFiles(files, stats) {
+  const container = document.getElementById('jsFileList');
+  const totalEl = document.getElementById('extractTotal');
+  const selectedEl = document.getElementById('extractSelected');
+  
+  totalEl.textContent = files.length;
+  selectedEl.textContent = files.length;
+  
+  container.innerHTML = files.map((file, index) => {
+    const sourceType = file.source || 'other';
+    const sourceLabel = getSourceLabel(sourceType);
+    const sourceClass = getSourceClass(sourceType);
+    
+    return `
+      <div class="js-file-item selected" data-index="${index}" onclick="toggleFileItem(this, ${index})">
+        <input type="checkbox" class="js-file-checkbox" checked data-index="${index}" onclick="event.stopPropagation(); toggleFileCheckbox(this, ${index})">
+        <div class="js-file-info">
+          <div class="js-file-url" title="${esc(file.url)}">${esc(file.url)}</div>
+          <div class="js-file-meta">
+            <span class="source-badge ${sourceClass}">${esc(sourceLabel)}</span>
+            ${file.parent ? '<span>Parent: ' + esc(file.parent.substring(0, 50)) + '</span>' : ''}
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+  
+  updateScanSelectedButton();
+}
+
+function getSourceLabel(sourceType) {
+  const labels = {
+    'script_tag': t('source_script_tag'),
+    'dynamic_import': t('source_dynamic'),
+    'dynamic_src_assignment': t('source_dynamic'),
+    'dynamic_createElement': t('source_dynamic'),
+    'es6_import': t('source_import'),
+    'commonjs_require': t('source_import'),
+    'preload': t('source_preload'),
+    'modulepreload': t('source_preload'),
+  };
+  return labels[sourceType] || sourceType;
+}
+
+function getSourceClass(sourceType) {
+  if (sourceType.includes('script_tag')) return 'script_tag';
+  if (sourceType.includes('dynamic')) return 'dynamic';
+  if (sourceType.includes('import') || sourceType.includes('require')) return 'import';
+  if (sourceType.includes('preload')) return 'preload';
+  return 'other';
+}
+
+function toggleFileItem(element, index) {
+  const checkbox = element.querySelector('.js-file-checkbox');
+  checkbox.checked = !checkbox.checked;
+  element.classList.toggle('selected', checkbox.checked);
+  updateSelectedCount();
+}
+
+function toggleFileCheckbox(checkbox, index) {
+  const item = checkbox.closest('.js-file-item');
+  item.classList.toggle('selected', checkbox.checked);
+  updateSelectedCount();
+}
+
+function selectAllFiles() {
+  document.querySelectorAll('.js-file-item').forEach(item => {
+    item.classList.add('selected');
+    item.querySelector('.js-file-checkbox').checked = true;
+  });
+  updateSelectedCount();
+}
+
+function deselectAllFiles() {
+  document.querySelectorAll('.js-file-item').forEach(item => {
+    item.classList.remove('selected');
+    item.querySelector('.js-file-checkbox').checked = false;
+  });
+  updateSelectedCount();
+}
+
+function updateSelectedCount() {
+  const selectedCount = document.querySelectorAll('.js-file-checkbox:checked').length;
+  document.getElementById('extractSelected').textContent = selectedCount;
+  updateScanSelectedButton();
+}
+
+function updateScanSelectedButton() {
+  const selectedCount = document.querySelectorAll('.js-file-checkbox:checked').length;
+  document.getElementById('btnScanSelected').disabled = selectedCount === 0;
+}
+
+function getSelectedUrls() {
+  const urls = [];
+  document.querySelectorAll('.js-file-checkbox:checked').forEach(checkbox => {
+    const index = parseInt(checkbox.dataset.index);
+    if (extractedFiles[index]) {
+      urls.push(extractedFiles[index].url);
+    }
+  });
+  return urls;
+}
+
+function scanSelectedFiles() {
+  const urls = getSelectedUrls();
+  if (urls.length === 0) return;
+  
+  saveSettings();
+  
+  const btn = document.getElementById('btnScanSelected');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Scanning...';
+
+  const config = {
+    js_urls: urls,
+    api_url: document.getElementById('apiUrl').value.trim(),
+    api_key: document.getElementById('apiKey').value.trim(),
+    model: document.getElementById('modelName').value.trim(),
+    cookie: document.getElementById('scanCookie').value.trim(),
+    full_scan: fullScanMode,
+  };
+
+  document.getElementById('progressSection').classList.add('active');
+  document.getElementById('resultsSection').style.display = 'none';
+  document.getElementById('terminal').innerHTML = '';
+  document.getElementById('progressBar').style.width = '0%';
+  allFindings = [];
+
+  fetch('/api/scan-selected', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(config)
+  })
+  .then(r => r.json())
+  .then(data => {
+    btn.disabled = false;
+    btn.innerHTML = '<span>' + t('btn_scan_selected') + '</span>';
+    
+    if (data.error) {
+      addLog('[!] ' + data.error, 'error');
+      return;
+    }
+    
+    currentScanId = data.scan_id;
+    connectSSE(data.scan_id);
+  })
+  .catch(err => {
+    btn.disabled = false;
+    btn.innerHTML = '<span>' + t('btn_scan_selected') + '</span>';
+    addLog('[!] ' + t('connection_failed') + ': ' + err.message, 'error');
+  });
+}
+
+// ============================================================
+// Direct Scan
+// ============================================================
+function startScan() {
+  const target = document.getElementById('targetUrl').value.trim();
+  if (!target) {
+    highlightError('targetUrl');
+    return;
+  }
+
+  saveSettings();
+
+  const btn = document.getElementById('btnScan');
+  btn.disabled = true;
+  document.body.classList.add('scanning');
+
+  document.getElementById('progressSection').classList.add('active');
+  document.getElementById('resultsSection').style.display = 'none';
+  document.getElementById('emptyState').style.display = 'none';
+  document.getElementById('extractSection').classList.remove('active');
+  document.getElementById('terminal').innerHTML = '';
+  document.getElementById('progressBar').style.width = '0%';
+  allFindings = [];
+
+  const config = {
+    target: target,
+    api_url: document.getElementById('apiUrl').value.trim(),
+    api_key: document.getElementById('apiKey').value.trim(),
+    model: document.getElementById('modelName').value.trim(),
+    depth: parseInt(document.getElementById('crawlDepth').value),
+    cookie: document.getElementById('scanCookie').value.trim(),
+    use_browser: useBrowserMode,
+    full_scan: fullScanMode,
+  };
+
+  fetch('/api/scan', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(config)
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.error) { addLog('[!] ' + data.error, 'error'); resetBtn(); return; }
+    currentScanId = data.scan_id;
+    connectSSE(data.scan_id);
+  })
+  .catch(err => { addLog('[!] ' + t('connection_failed') + ': ' + err.message, 'error'); resetBtn(); });
+}
+
+function highlightError(elementId) {
+  const el = document.getElementById(elementId);
+  el.style.borderColor = 'var(--danger)';
+  el.style.boxShadow = '0 0 0 3px var(--danger-dim)';
+  el.focus();
+  setTimeout(() => { el.style.borderColor=''; el.style.boxShadow=''; }, 2000);
+}
+
+// ============================================================
+// SSE & Results
+// ============================================================
+function connectSSE(scanId, retryCount) {
+  retryCount = retryCount || 0;
+  var MAX_RETRIES = 5;
+  var heartbeatTimer = null;
+  
+  var es = new EventSource('/api/scan/' + scanId + '/events');
+  
+  function startHeartbeat() {
+    heartbeatTimer = setTimeout(function() {
+      console.warn('SSE heartbeat timeout');
+      es.close();
+      attemptReconnect();
+    }, 60000);
+  }
+  
+  function resetHeartbeat() {
+    if (heartbeatTimer) clearTimeout(heartbeatTimer);
+    startHeartbeat();
+  }
+  
+  function attemptReconnect() {
+    if (retryCount < MAX_RETRIES) {
+      retryCount++;
+      addLog('[*] Reconnecting... (' + retryCount + '/' + MAX_RETRIES + ')', 'warn');
+      setTimeout(function() { connectSSE(scanId, retryCount); }, 2000 * retryCount);
+    } else {
+      addLog('[!] Max retries reached. Loading available results...', 'error');
+      loadResults(scanId);
+    }
+  }
+
+  es.onopen = function() {
+    retryCount = 0;
+    startHeartbeat();
+  };
+
+  es.onmessage = function(e) {
+    resetHeartbeat();
+    var d = JSON.parse(e.data);
+    
+    if (d.type === 'log') {
+      var cls = 'info';
+      if (d.message.includes('[+]') || d.message.includes('[✓]') || d.message.includes('complete')) cls = 'success';
+      else if (d.message.includes('[!]') || d.message.includes('[-]')) cls = 'error';
+      else if (d.message.includes('AI')) cls = 'ai';
+      else if (d.message.includes('->')) cls = 'warn';
+      addLog(d.message, cls);
+    }
+    
+    if (d.type === 'progress') {
+      document.getElementById('progressBar').style.width = d.value + '%';
+      document.getElementById('progressPct').textContent = d.value + '%';
+      if (d.total > 0) {
+        var done = Math.round(d.value / 100 * d.total);
+        document.getElementById('progressDetail').textContent = d.current + '  (' + done + '/' + d.total + ')';
+      }
+    }
+    
+    if (d.type === 'done') { 
+      if (heartbeatTimer) clearTimeout(heartbeatTimer);
+      es.close(); 
+      loadResults(scanId); 
+    }
+    
+    if (d.type === 'error') { 
+      if (heartbeatTimer) clearTimeout(heartbeatTimer);
+      es.close(); 
+      addLog('[!] ' + (d.message || t('scan_failed')), 'error'); 
+      resetBtn(); 
+    }
+  };
+
+  es.onerror = function() {
+    if (heartbeatTimer) clearTimeout(heartbeatTimer);
+    
+    if (es.readyState === EventSource.CLOSED) {
+      loadResults(scanId);
+    } else {
+      es.close();
+      attemptReconnect();
+    }
+  };
+}
+
+function loadResults(scanId) {
+  fetch('/api/scan/' + scanId + '/results').then(r => r.json()).then(data => {
+    allFindings = data.findings || [];
+    document.getElementById('sHigh').textContent = data.high || 0;
+    document.getElementById('sMed').textContent = data.medium || 0;
+    document.getElementById('sLow').textContent = data.low || 0;
+    document.getElementById('sTotal').textContent = data.total || 0;
+    renderTable(allFindings);
+    document.getElementById('resultsSection').style.display = 'block';
+    resetBtn();
+  }).catch(() => resetBtn());
+}
+
+// ============================================================
+// Table & Filters
+// ============================================================
+function renderTable(findings) {
+  const tbody = document.getElementById('findingsBody');
+  var filtered = findings;
+  if (currentFilter !== 'all') filtered = filtered.filter(function(f) { return f.severity === currentFilter; });
+  if (searchTerm) {
+    var s = searchTerm.toLowerCase();
+    filtered = filtered.filter(function(f) {
+      return (f.type||'').toLowerCase().indexOf(s) !== -1 || 
+             (f.url||'').toLowerCase().indexOf(s) !== -1 || 
+             (f.evidence||'').toLowerCase().indexOf(s) !== -1;
+    });
+  }
+  
+  displayedFindings = filtered;
+  
+  if (!filtered.length) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:40px;">' + (findings.length ? t('no_match') : t('no_findings')) + '</td></tr>';
+    return;
+  }
+  
+  tbody.innerHTML = filtered.map(function(f, i) {
+    var severityClass = (f.severity||'low').toLowerCase();
+    var fileName = (f.url||'').split('/').pop();
+    var evidenceShort = (f.evidence||'').substring(0, 70);
+    
+    return '<tr class="finding-row" data-index="' + i + '">' +
+      '<td style="color:var(--muted)">' + (i+1) + '</td>' +
+      '<td><span class="badge ' + esc(severityClass) + '">' + esc(f.severity||'?') + '</span></td>' +
+      '<td>' + esc(f.type||'') + '</td>' +
+      '<td class="file-cell" title="' + esc(f.url||'') + '">' + esc(fileName) + '</td>' +
+      '<td style="color:var(--muted)">L' + (f.line||'?') + '</td>' +
+      '<td class="evidence-cell" title="' + esc(f.evidence||'') + '">' + esc(evidenceShort) + '</td>' +
+      '<td><span class="source-tag ' + esc(f.source||'') + '">' + esc(f.source||'?') + '</span></td>' +
+    '</tr>';
+  }).join('');
+}
+
+function setFilter(f, btn) {
+  currentFilter = f;
+  document.querySelectorAll('.filter-btn').forEach(function(b) { b.classList.remove('active'); });
+  btn.classList.add('active');
+  renderTable(allFindings);
+}
+
+function setSearch(v) { searchTerm = v; renderTable(allFindings); }
+
+// ============================================================
+// Detail Modal
+// ============================================================
+function showDetail(f) {
+  document.getElementById('modalTitle').textContent = t('detail_title');
+  document.getElementById('modalBody').innerHTML = 
+    '<div class="modal-row"><div class="modal-label">' + t('modal_severity') + '</div><div class="modal-value"><span class="badge ' + esc((f.severity||'low').toLowerCase()) + '">' + esc(f.severity) + '</span></div></div>' +
+    '<div class="modal-row"><div class="modal-label">' + t('modal_file') + '</div><div class="modal-value"><code>' + esc(f.url||'') + '</code></div></div>' +
+    '<div class="modal-row"><div class="modal-label">' + t('modal_line') + '</div><div class="modal-value">' + (f.line||'?') + '</div></div>' +
+    '<div class="modal-row"><div class="modal-label">' + t('modal_source') + '</div><div class="modal-value"><span class="source-tag ' + esc(f.source||'') + '">' + esc(f.source||'unknown') + '</span></div></div>' +
+    '<div class="modal-row"><div class="modal-label">' + t('modal_evidence') + '</div><div class="modal-value"><pre>' + esc(f.evidence||t('modal_na')) + '</pre></div></div>' +
+    '<div class="modal-row"><div class="modal-label">' + t('modal_impact') + '</div><div class="modal-value">' + esc(f.impact||t('modal_na')) + '</div></div>' +
+    '<div class="modal-row"><div class="modal-label">' + t('modal_fix') + '</div><div class="modal-value" style="color:var(--warn)">' + esc(f.recommendation||t('modal_manual')) + '</div></div>';
+  document.getElementById('detailModal').classList.add('show');
+}
+
+function closeModal() { document.getElementById('detailModal').classList.remove('show'); }
+document.getElementById('detailModal').addEventListener('click', function(e) { if (e.target === this) closeModal(); });
+
+// Add click handler for finding rows
+document.getElementById('findingsBody').addEventListener('click', function(e) {
+  const row = e.target.closest('.finding-row');
+  if (row) {
+    const index = parseInt(row.dataset.index);
+    if (displayedFindings && displayedFindings[index]) {
+      showDetail(displayedFindings[index]);
+    }
+  }
+});
+
+// ============================================================
+// Export
+// ============================================================
+function doExport(fmt) {
+  if (!currentScanId) return;
+  window.open('/api/scan/' + currentScanId + '/export/' + fmt, '_blank');
+}
+
+// ============================================================
+// Helpers
+// ============================================================
+function addLog(msg, cls) {
+  var term = document.getElementById('terminal');
+  var div = document.createElement('div');
+  div.className = 'log-line ' + (cls||'info');
+  var ts = msg.match(/^\[(\d{2}:\d{2}:\d{2})\]/);
+  if (ts) {
+    div.innerHTML = '<span class="ts">[' + ts[1] + ']</span> ' + esc(msg.substring(11));
+  } else { div.textContent = msg; }
+  term.appendChild(div);
+  term.scrollTop = term.scrollHeight;
+}
+
+function resetBtn() {
+  document.getElementById('btnScan').disabled = false;
+  document.body.classList.remove('scanning');
+}
+
+function esc(s) {
+  if (s == null) return '';
+  var d = document.createElement('div');
+  d.textContent = String(s);
+  return d.innerHTML;
+}
+
+document.getElementById('targetUrl').addEventListener('keydown', function(e) { 
+  if (e.key === 'Enter') startScan(); 
+});
+</script>
+</body>
+</html>
