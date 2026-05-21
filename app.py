@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-JSLeakHunter v2.0 - Enhanced Backend
+JSLeakHunter v2.1 - Enhanced Backend
 Fixed: Unicode surrogates not allowed
+Enhanced: Information collection (domains, IPs, phones, emails, credentials, etc.)
+Enhanced: Webpack chunk JS extraction
 """
 
 import csv
@@ -18,11 +20,9 @@ from io import StringIO
 
 # ============ Windows编码修复 (必须在最前面) ============
 if sys.platform == 'win32':
-    # 设置UTF-8模式
     os.environ['PYTHONIOENCODING'] = 'utf-8'
     os.environ['PYTHONUTF8'] = '1'
     
-    # 重新配置标准输出
     try:
         if hasattr(sys.stdout, 'reconfigure'):
             sys.stdout.reconfigure(encoding='utf-8', errors='ignore')
@@ -70,6 +70,12 @@ except ImportError as e:
     print(f"[!] Warning: patterns module not found: {e}")
     def get_patterns():
         return {}
+
+try:
+    from info_collector import InfoCollector
+except ImportError as e:
+    print(f"[!] Warning: info_collector module not found: {e}")
+    InfoCollector = None
 
 
 # ================================================================
@@ -151,10 +157,23 @@ def init_db():
             total_files INTEGER DEFAULT 0,
             findings_json TEXT DEFAULT '[]',
             stats_json TEXT DEFAULT '{}',
-            config_json TEXT DEFAULT '{}'
+            config_json TEXT DEFAULT '{}',
+            info_json TEXT DEFAULT '{}'
         )''')
         conn.commit()
         conn.close()
+        
+        # Add info_json column if it doesn't exist (migration)
+        try:
+            conn = get_db_connection()
+            conn.execute("SELECT info_json FROM scans LIMIT 1")
+            conn.close()
+        except sqlite3.OperationalError:
+            conn = get_db_connection()
+            conn.execute("ALTER TABLE scans ADD COLUMN info_json TEXT DEFAULT '{}'")
+            conn.commit()
+            conn.close()
+        
         print("[+] Database initialized")
     except Exception as e:
         print(f"[!] Database init error: {e}")
@@ -218,6 +237,7 @@ def start_scan():
         'logs': [],
         'findings': [],
         'stats': {},
+        'info': {},  # NEW: Information collection results
     }
 
     thread = threading.Thread(target=run_scan_thread, args=(scan_id, config), daemon=True)
@@ -241,6 +261,7 @@ def run_scan_thread(scan_id, config):
 
     targets = config.get('targets', [config['target']])
     all_findings = []
+    all_info = {}
 
     for target in targets:
         log_callback(f"[*] Scanning: {target}")
@@ -253,12 +274,23 @@ def run_scan_thread(scan_id, config):
                 findings = scanner.run(progress_callback=progress_callback)
                 all_findings.extend(clean_data(findings))
                 scan_state['stats'] = scanner.get_stats()
+                # NEW: Collect info results
+                info_results = scanner.get_info_results()
+                if info_results:
+                    for key, value in info_results.items():
+                        if key not in all_info:
+                            all_info[key] = []
+                        if isinstance(value, list):
+                            all_info[key].extend(value)
+                        else:
+                            all_info[key].append(value)
             else:
                 log_callback("[!] Scanner module not available")
         except Exception as e:
             log_callback(f"[!] Error: {safe_str(str(e), 200)}")
 
     scan_state['findings'] = all_findings
+    scan_state['info'] = all_info
     scan_state['status'] = 'completed'
     scan_state['progress'] = 100
 
@@ -266,12 +298,13 @@ def run_scan_thread(scan_id, config):
         with db_lock:
             conn = get_db_connection()
             conn.execute(
-                "UPDATE scans SET status=?, completed_at=?, findings_json=?, stats_json=? WHERE id=?",
+                "UPDATE scans SET status=?, completed_at=?, findings_json=?, stats_json=?, info_json=? WHERE id=?",
                 (
                     'completed',
                     datetime.now().isoformat(),
                     safe_json_dumps(all_findings),
                     safe_json_dumps(scan_state.get('stats', {})),
+                    safe_json_dumps(all_info),
                     scan_id
                 )
             )
@@ -315,7 +348,9 @@ def extract_js_only():
                 page_url=target,
                 headers=headers,
                 use_browser=data.get('use_browser', False),
-                depth=int(data.get('depth', 2))
+                depth=int(data.get('depth', 2)),
+                cookie=cookie,
+                on_log=None
             )
         else:
             # Fallback: basic JS extraction
@@ -378,6 +413,7 @@ def scan_selected_js():
         'logs': [],
         'findings': [],
         'stats': {},
+        'info': {},  # NEW
     }
 
     thread = threading.Thread(target=run_selected_scan_thread, args=(scan_id, config), daemon=True)
@@ -418,6 +454,11 @@ def run_selected_scan_thread(scan_id, config):
     temp_scanner = None
     if Scanner:
         temp_scanner = Scanner(temp_config, on_log=log_callback)
+
+    # NEW: Info collector for selected scan
+    info_collector = None
+    if InfoCollector:
+        info_collector = InfoCollector()
 
     for idx, url in enumerate(js_urls):
         file_short = safe_str(url.split('/')[-1][:50])
@@ -463,6 +504,10 @@ def run_selected_scan_thread(scan_id, config):
                 except Exception as e:
                     log_callback(f"  -> AI error: {safe_str(str(e), 50)}")
 
+            # NEW: Information collection
+            if info_collector:
+                info_collector.collect_all(content, url)
+
         except Exception as e:
             log_callback(f"  -> Error: {safe_str(str(e), 50)}")
 
@@ -470,16 +515,21 @@ def run_selected_scan_thread(scan_id, config):
     scan_state['status'] = 'completed'
     scan_state['progress'] = 100
 
+    # NEW: Store info results
+    if info_collector:
+        scan_state['info'] = info_collector.get_summary()
+
     try:
         with db_lock:
             conn = get_db_connection()
             conn.execute(
-                "UPDATE scans SET status=?, completed_at=?, findings_json=?, stats_json=? WHERE id=?",
+                "UPDATE scans SET status=?, completed_at=?, findings_json=?, stats_json=?, info_json=? WHERE id=?",
                 (
                     'completed',
                     datetime.now().isoformat(),
                     safe_json_dumps(all_findings),
                     safe_json_dumps(scan_state.get('stats', {})),
+                    safe_json_dumps(scan_state.get('info', {})),
                     scan_id
                 )
             )
@@ -597,6 +647,7 @@ def scan_results(scan_id):
     if scan_id in active_scans:
         state = active_scans[scan_id]
         findings = state['findings']
+        info = state.get('info', {})
     else:
         try:
             with db_lock:
@@ -609,12 +660,14 @@ def scan_results(scan_id):
         if not row:
             return jsonify({'error': 'Not found'}), 404
         findings = json.loads(row[6]) if row[6] else []
+        info = json.loads(row[9]) if len(row) > 9 and row[9] else {}
         state = {
             'status': row[2],
             'stats': json.loads(row[7]) if row[7] else {},
         }
 
     findings = clean_data(findings)
+    info = clean_data(info)
 
     high = sum(1 for f in findings if f.get('severity') == 'HIGH')
     med = sum(1 for f in findings if f.get('severity') == 'MEDIUM')
@@ -628,6 +681,7 @@ def scan_results(scan_id):
         'low': low,
         'findings': findings,
         'stats': state.get('stats', {}),
+        'info': info,  # NEW: Information collection results
     })
 
 
@@ -637,7 +691,7 @@ def scan_history():
         with db_lock:
             conn = get_db_connection()
             rows = conn.execute(
-                "SELECT id, target, status, started_at, completed_at, findings_json FROM scans ORDER BY started_at DESC LIMIT 50"
+                "SELECT id, target, status, started_at, completed_at, findings_json, info_json FROM scans ORDER BY started_at DESC LIMIT 50"
             ).fetchall()
             conn.close()
     except Exception:
@@ -646,6 +700,8 @@ def scan_history():
     history = []
     for row in rows:
         findings = json.loads(row[5]) if row[5] else []
+        info = json.loads(row[6]) if len(row) > 6 and row[6] else {}
+        info_count = sum(len(v) for v in info.values() if isinstance(v, list))
         history.append({
             'id': row[0],
             'target': safe_str(row[1], 100),
@@ -656,21 +712,44 @@ def scan_history():
             'high': sum(1 for f in findings if f.get('severity') == 'HIGH'),
             'medium': sum(1 for f in findings if f.get('severity') == 'MEDIUM'),
             'low': sum(1 for f in findings if f.get('severity') == 'LOW'),
+            'info_count': info_count,  # NEW: Info count
         })
 
     return jsonify(history)
 
+@app.route('/api/extract/search', methods=['POST'])
+def search_js_files():
+    """在已提取的JS文件中搜索"""
+    data = request.json or {}
+    js_files = data.get('js_files', [])
+    query = data.get('query', '').strip().lower()
+    
+    if not query:
+        return jsonify({'results': js_files, 'total': len(js_files)})
+    
+    filtered = [
+        f for f in js_files 
+        if query in f.get('url', '').lower() or 
+           query in f.get('url', '').split('/')[-1].lower()
+    ]
+    
+    return jsonify({
+        'results': clean_data(filtered),
+        'total': len(filtered),
+        'original_total': len(js_files)
+    })
 
 @app.route('/api/scan/<scan_id>/export/<fmt>')
 def export_report(scan_id, fmt):
     if scan_id in active_scans:
         findings = active_scans[scan_id]['findings']
         target = active_scans[scan_id].get('target', '')
+        info = active_scans[scan_id].get('info', {})
     else:
         try:
             with db_lock:
                 conn = get_db_connection()
-                row = conn.execute("SELECT target, findings_json FROM scans WHERE id=?", (scan_id,)).fetchone()
+                row = conn.execute("SELECT target, findings_json, info_json FROM scans WHERE id=?", (scan_id,)).fetchone()
                 conn.close()
         except Exception:
             return jsonify({'error': 'Database error'}), 500
@@ -679,8 +758,10 @@ def export_report(scan_id, fmt):
             return jsonify({'error': 'Not found'}), 404
         target = row[0]
         findings = json.loads(row[1]) if row[1] else []
+        info = json.loads(row[2]) if len(row) > 2 and row[2] else {}
 
     findings = clean_data(findings)
+    info = clean_data(info)
     target = safe_str(target) if target else ''
 
     if fmt == 'json':
@@ -689,7 +770,8 @@ def export_report(scan_id, fmt):
             'scan_id': scan_id,
             'timestamp': datetime.now().isoformat(),
             'total_findings': len(findings),
-            'findings': findings
+            'findings': findings,
+            'info': info,  # NEW
         })
 
     elif fmt == 'csv':
@@ -707,18 +789,32 @@ def export_report(scan_id, fmt):
                 safe_str(f.get('source', '')),
                 safe_str(f.get('recommendation', ''))
             ])
+        
+        # NEW: Add info collection to CSV
+        if info:
+            writer.writerow([])
+            writer.writerow(['--- Information Collection ---'])
+            for category, items in info.items():
+                if isinstance(items, list) and items:
+                    writer.writerow([f'=== {category} ({len(items)}) ==='])
+                    for item in items:
+                        if isinstance(item, dict):
+                            writer.writerow([safe_str(item.get('value', '')), safe_str(item.get('name', '')), safe_str(item.get('source', ''))])
+                        else:
+                            writer.writerow([safe_str(item)])
+        
         return Response(si.getvalue(), mimetype='text/csv',
                         headers={'Content-Disposition': f'attachment; filename=jsleakhunter_{scan_id}.csv'})
 
     elif fmt == 'markdown':
-        md = generate_markdown(findings, target, scan_id)
+        md = generate_markdown(findings, target, scan_id, info)
         return Response(md, mimetype='text/markdown',
                         headers={'Content-Disposition': f'attachment; filename=jsleakhunter_{scan_id}.md'})
 
     return jsonify({'error': 'Invalid format. Use json, csv, or markdown'}), 400
 
 
-def generate_markdown(findings, target, scan_id):
+def generate_markdown(findings, target, scan_id, info=None):
     high = sum(1 for f in findings if f.get('severity') == 'HIGH')
     med = sum(1 for f in findings if f.get('severity') == 'MEDIUM')
     low = sum(1 for f in findings if f.get('severity') == 'LOW')
@@ -760,6 +856,28 @@ def generate_markdown(findings, target, scan_id):
 
 """
 
+    # NEW: Information Collection section
+    if info:
+        md += """## Information Collection
+
+"""
+        for category, items in info.items():
+            if isinstance(items, list) and items:
+                md += f"""### {category} ({len(items)})
+
+"""
+                for item in items:
+                    if isinstance(item, dict):
+                        md += f"- `{safe_str(item.get('value', ''))}`"
+                        if item.get('name'):
+                            md += f" ({safe_str(item['name'])})"
+                        if item.get('source'):
+                            md += f" — source: {safe_str(item['source'], 100)}"
+                        md += "\n"
+                    else:
+                        md += f"- `{safe_str(str(item))}`\n"
+                md += "\n"
+
     return md
 
 
@@ -771,11 +889,11 @@ if __name__ == '__main__':
     import urllib3
     urllib3.disable_warnings()
     
-    # ASCII-safe banner
     print("")
     print("=" * 55)
-    print("   JSLeakHunter v2.0")
+    print("   JSLeakHunter v2.1")
     print("   AI-Powered Frontend Leak Detection")
+    print("   Enhanced with Information Collection")
     print("   http://127.0.0.1:5000")
     print("=" * 55)
     print("")

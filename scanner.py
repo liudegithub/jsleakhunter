@@ -1,8 +1,9 @@
 """
-JSLeakHunter — Scanner Engine v3.2
+JSLeakHunter — Scanner Engine v3.3
 Smart detection based on 雪瞳 tool's logic
 Fixed: minified JS detection (long line handling) + base64 false positive filtering
 Enhanced: Context-aware crypto key detection (AES/DES with short variable names)
+Enhanced: Information collection (domains, IPs, phones, emails, credentials, etc.)
 NEVER skip JS files - analyze everything
 """
 
@@ -24,6 +25,7 @@ from patterns import (
     is_key_blacklisted, contains_chinese, is_camel_case,
 )
 from js_extractor import extract_js_files
+from info_collector import InfoCollector
 
 
 HEADERS = {
@@ -55,6 +57,9 @@ class Scanner:
         self.seen_urls = set()
         self.use_browser = config.get('use_browser', False)
         self.full_scan = config.get('full_scan', False)
+        # NEW: Information collector
+        self.info_collector = InfoCollector()
+        self.info_results = {}
         self.stats = {
             'files_total': 0,
             'files_scanned': 0,
@@ -83,10 +88,24 @@ class Scanner:
             page_url=target,
             headers=self._get_headers(),
             use_browser=self.use_browser,
-            depth=depth
+            depth=depth,
+            on_log=self.on_log
         )
 
         self.on_log(f"  [+] Found {extract_stats['unique_urls']} unique JS files")
+        
+        # NEW: Log webpack info if available
+        webpack_info = extract_stats.get('webpack_info', {})
+        if webpack_info.get('chunk_maps_count', 0) > 0:
+            self.on_log(f"  [+] Webpack detected: publicPath={webpack_info.get('public_path', 'N/A')}")
+            self.on_log(f"  [+] Webpack chunk maps: {webpack_info['chunk_maps_count']} discovered")
+        
+        # Log extraction stats by type
+        by_type = extract_stats.get('by_type', {})
+        for stype, count in by_type.items():
+            if count > 0:
+                self.on_log(f"  [+] {stype}: {count}")
+        
         all_js_urls = {info['url'] for info in js_info}
 
         self.on_log("  [*] Checking source maps...")
@@ -107,6 +126,14 @@ class Scanner:
 
         patterns = get_patterns()
 
+        # NEW: Phase 1.5 - Information collection from HTML page
+        self.on_log("[*] Phase 1.5: Information collection from HTML...")
+        self.info_collector.collect_all(resp.text, target)
+        info_stats = self.info_collector.get_stats()
+        for key, count in info_stats.items():
+            if count > 0:
+                self.on_log(f"  [+] {key}: {count}")
+
         self.on_log("[*] Phase 2: Scanning external JS files...")
         scanned = 0
         for url in all_js_urls:
@@ -121,6 +148,8 @@ class Scanner:
                 self.stats['files_skipped'] += 1
                 continue
             self._scan_content(content, url, patterns)
+            # NEW: Collect info from JS files too
+            self.info_collector.collect_all(content, url)
 
         if source_map_contents:
             self.on_log(f"[*] Phase 3: Scanning {len(source_map_contents)} source map(s)...")
@@ -131,6 +160,8 @@ class Scanner:
                     source_label = f"{map_url} -> {source_name}"
                     self.on_log(f"  [map] {source_name[:60]}")
                     self._scan_content(source_content, source_label, patterns)
+                    # NEW: Collect info from source maps too
+                    self.info_collector.collect_all(source_content, source_label)
 
         self.on_log(f"[*] Phase 4: Scanning {len(inline_scripts)} inline scripts...")
         for idx, script_content in enumerate(inline_scripts):
@@ -139,6 +170,8 @@ class Scanner:
             inline_id = f"inline://script-{idx+1}"
             self.on_log(f"  [inline-{idx+1}] ({len(script_content)} chars)")
             self._scan_content(script_content, inline_id, patterns)
+            # NEW: Collect info from inline scripts too
+            self.info_collector.collect_all(script_content, inline_id)
 
         self.on_log("[*] Phase 5: Deduplication and ranking...")
         before = len(self.findings)
@@ -147,6 +180,12 @@ class Scanner:
 
         sev_order = {"HIGH": 0, "MEDIUM": 1, "LOW": 2}
         self.findings.sort(key=lambda x: sev_order.get(x.get('severity', 'LOW'), 3))
+
+        # NEW: Phase 6 - Finalize information collection
+        self.on_log("[*] Phase 6: Finalizing information collection...")
+        self.info_results = self.info_collector.get_summary()
+        info_total = self.info_collector.get_total()
+        self.on_log(f"  [+] Total collected info items: {info_total}")
 
         self._log_summary()
         if progress_callback:
@@ -758,6 +797,18 @@ class Scanner:
         self.on_log(f"    Regex: {self.stats['regex_hits']} hits | AI: {self.stats['ai_calls']} calls, {self.stats['ai_hits']} hits")
         if self.stats['duplicates_removed'] > 0:
             self.on_log(f"    Dedup: {self.stats['duplicates_removed']} duplicates removed")
+        # NEW: Log info collection summary
+        info_stats = self.info_collector.get_stats()
+        info_items = sum(info_stats.values())
+        if info_items > 0:
+            self.on_log(f"    Info: {info_items} items collected")
+            for key, count in info_stats.items():
+                if count > 0:
+                    self.on_log(f"      {key}: {count}")
 
     def get_stats(self):
         return dict(self.stats)
+
+    def get_info_results(self):
+        """NEW: Get information collection results"""
+        return self.info_results

@@ -265,6 +265,8 @@ textarea { resize: vertical; min-height: 60px; }
   justify-content: space-between;
   align-items: center;
   margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 12px;
 }
 .extract-stats {
   display: flex;
@@ -278,6 +280,8 @@ textarea { resize: vertical; min-height: 60px; }
 .extract-actions {
   display: flex;
   gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
 }
 .btn-select-all, .btn-deselect-all {
   background: transparent;
@@ -294,6 +298,130 @@ textarea { resize: vertical; min-height: 60px; }
 .btn-select-all:hover, .btn-deselect-all:hover {
   border-color: var(--accent);
   color: var(--accent);
+}
+
+/* 新增：JS文件搜索框 */
+.file-search-box {
+  display: flex;
+  align-items: center;
+  background: var(--input-bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0 12px;
+  transition: all 0.2s ease;
+  width: 220px;
+}
+
+.file-search-box:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
+.file-search-box .search-icon {
+  color: var(--muted);
+  font-size: 12px;
+  margin-right: 6px;
+}
+
+.file-search-box input {
+  border: none;
+  outline: none;
+  padding: 6px 0;
+  font-size: 11px;
+  color: var(--text-bright);
+  background: transparent;
+  flex: 1;
+  min-width: 0;
+}
+
+.file-search-box input::placeholder {
+  color: var(--muted);
+}
+
+.btn-search-clear {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--muted);
+  padding: 4px;
+  font-size: 12px;
+  border-radius: 50%;
+  transition: all 0.2s;
+}
+
+.btn-search-clear:hover {
+  color: var(--danger);
+  background: var(--danger-dim);
+}
+
+/* JS文件搜索高亮 */
+.js-file-item mark {
+  background: rgba(255, 171, 0, 0.3);
+  color: var(--warn);
+  padding: 0 2px;
+  border-radius: 2px;
+}
+
+/* 搜索结果提示 */
+.search-hint {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--info-dim);
+  color: var(--info);
+  border-radius: 6px;
+  margin-bottom: 8px;
+  font-size: 11px;
+}
+
+.btn-clear-filter {
+  background: none;
+  border: 1px solid var(--info);
+  color: var(--info);
+  padding: 2px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 10px;
+  margin-left: auto;
+  transition: all 0.2s;
+}
+
+.btn-clear-filter:hover {
+  background: var(--info);
+  color: var(--bg);
+}
+
+/* 新增：证据控制按钮 */
+.evidence-controls {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.btn-evidence-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  background: var(--input-bg);
+  color: var(--muted);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: var(--font-mono);
+  letter-spacing: 1px;
+}
+
+.btn-evidence-toggle:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.btn-evidence-toggle .icon {
+  font-size: 12px;
 }
 
 .js-file-list {
@@ -443,7 +571,70 @@ table.findings tbody tr:hover { background: var(--card-hover); }
 .badge.medium { background: var(--warn-dim); color: var(--warn); border: 1px solid rgba(255,171,0,0.3); }
 .badge.low { background: var(--info-dim); color: var(--info); border: 1px solid rgba(68,138,255,0.3); }
 
-.evidence-cell { max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; color: var(--muted); }
+/* 新增：证据单元格样式 */
+.evidence-cell { 
+  max-width: 280px; 
+  position: relative; 
+  cursor: pointer;
+}
+
+.evidence-content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.evidence-text {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted);
+  word-break: break-all;
+  line-height: 1.5;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+/* 默认收起状态 */
+.evidence-cell:not(.expanded) .evidence-text {
+  max-height: 36px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  text-overflow: ellipsis;
+}
+
+/* 展开状态 */
+.evidence-cell.expanded .evidence-text {
+  max-height: none;
+  display: block;
+  -webkit-line-clamp: unset;
+  white-space: pre-wrap;
+}
+
+/* 单个证据展开/收起按钮 */
+.evidence-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  padding: 2px 8px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 9px;
+  transition: all 0.2s ease;
+  align-self: flex-start;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+}
+
+.evidence-toggle-btn:hover {
+  background: var(--accent-glow);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 .file-cell { max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; color: var(--text); }
 
 .source-tag { font-size: 9px; padding: 1px 6px; border-radius: 2px; letter-spacing: 1px; }
@@ -701,6 +892,12 @@ table.findings tbody tr:hover { background: var(--card-hover); }
           <span><span class="count" id="extractSelected">0</span> <span data-i18n="selected">selected</span></span>
         </div>
         <div class="extract-actions">
+          <!-- 新增：搜索框 -->
+          <div class="file-search-box">
+            <span class="search-icon">&#128269;</span>
+            <input type="text" id="jsFileSearch" placeholder="搜索文件名..." oninput="filterJsFiles(this.value)">
+            <button class="btn-search-clear" id="btnClearSearch" style="display:none" onclick="clearFileSearch()">&#10005;</button>
+          </div>
           <button class="btn-select-all" onclick="selectAllFiles()" data-i18n="select_all">Select All</button>
           <button class="btn-deselect-all" onclick="deselectAllFiles()" data-i18n="deselect_all">Deselect All</button>
         </div>
@@ -737,6 +934,15 @@ table.findings tbody tr:hover { background: var(--card-hover); }
         <button class="filter-btn" onclick="setFilter('MEDIUM',this)">MEDIUM</button>
         <button class="filter-btn" onclick="setFilter('LOW',this)">LOW</button>
         <input type="text" class="filter-search" data-i18n-placeholder="search" placeholder="Search..." oninput="setSearch(this.value)">
+        <!-- 新增：证据控制按钮 -->
+        <div class="evidence-controls">
+          <button class="btn-evidence-toggle" onclick="expandAllEvidence()" title="展开全部证据">
+            <span class="icon">&#9660;</span> 展开证据
+          </button>
+          <button class="btn-evidence-toggle" onclick="collapseAllEvidence()" title="收起全部证据">
+            <span class="icon">&#9650;</span> 收起证据
+          </button>
+        </div>
       </div>
       <div class="table-wrap">
         <table class="findings">
@@ -834,6 +1040,9 @@ const I18N = {
     source_script_tag: 'Script 标签', source_dynamic: '动态加载', source_import: 'Import',
     source_preload: '预加载', source_other: '其他',
     batch_delete: '批量删除', batch_delete_confirm: '确定删除选中的 {count} 条记录？',
+    search_file: '搜索文件名...',
+    expand_evidence: '展开证据',
+    collapse_evidence: '收起证据',
   },
   en: {
     subtitle: 'AI-Powered Frontend Hardcoded Leak Detection',
@@ -869,6 +1078,9 @@ const I18N = {
     source_script_tag: 'Script Tag', source_dynamic: 'Dynamic', source_import: 'Import',
     source_preload: 'Preload', source_other: 'Other',
     batch_delete: 'Batch Delete', batch_delete_confirm: 'Delete {count} selected records?',
+    search_file: 'Search filename...',
+    expand_evidence: 'Expand',
+    collapse_evidence: 'Collapse',
   }
 };
 
@@ -1159,7 +1371,6 @@ function batchDeleteSelected() {
             selectedHistoryIds.clear();
             updateBatchDeleteUI();
             
-            // 如果列表为空，显示空状态
             const list = document.getElementById('historyList');
             if (list.children.length === 0) {
                 list.innerHTML = '<div class="empty-state"><p>' + t('empty_history') + '</p></div>';
@@ -1261,7 +1472,7 @@ function renderExtractedFiles(files, stats) {
     const sourceClass = getSourceClass(sourceType);
     
     return `
-      <div class="js-file-item selected" data-index="${index}" onclick="toggleFileItem(this, ${index})">
+      <div class="js-file-item selected" data-index="${index}" data-url="${esc(file.url)}" onclick="toggleFileItem(this, ${index})">
         <input type="checkbox" class="js-file-checkbox" checked data-index="${index}" onclick="event.stopPropagation(); toggleFileCheckbox(this, ${index})">
         <div class="js-file-info">
           <div class="js-file-url" title="${esc(file.url)}">${esc(file.url)}</div>
@@ -1273,6 +1484,9 @@ function renderExtractedFiles(files, stats) {
       </div>
     `;
   }).join('');
+  
+  // 清除搜索
+  clearFileSearch();
   
   updateScanSelectedButton();
 }
@@ -1583,7 +1797,9 @@ function renderTable(findings) {
   tbody.innerHTML = filtered.map(function(f, i) {
     var severityClass = (f.severity||'low').toLowerCase();
     var fileName = (f.url||'').split('/').pop();
-    var evidenceShort = (f.evidence||'').substring(0, 70);
+    var evidence = f.evidence || '';
+    var evidenceShort = evidence.length > 70 ? evidence.substring(0, 70) + '...' : evidence;
+    var needsToggle = evidence.length > 70;
     
     return '<tr class="finding-row" data-index="' + i + '">' +
       '<td style="color:var(--muted)">' + (i+1) + '</td>' +
@@ -1591,7 +1807,12 @@ function renderTable(findings) {
       '<td>' + esc(f.type||'') + '</td>' +
       '<td class="file-cell" title="' + esc(f.url||'') + '">' + esc(fileName) + '</td>' +
       '<td style="color:var(--muted)">L' + (f.line||'?') + '</td>' +
-      '<td class="evidence-cell" title="' + esc(f.evidence||'') + '">' + esc(evidenceShort) + '</td>' +
+      '<td class="evidence-cell">' +
+        '<div class="evidence-content">' +
+          '<span class="evidence-text">' + esc(evidence) + '</span>' +
+          (needsToggle ? '<button class="evidence-toggle-btn" onclick="event.stopPropagation(); toggleEvidence(this.closest(\'.evidence-cell\'), this)">&#9660; 展开</button>' : '') +
+        '</div>' +
+      '</td>' +
       '<td><span class="source-tag ' + esc(f.source||'') + '">' + esc(f.source||'?') + '</span></td>' +
     '</tr>';
   }).join('');
@@ -1669,6 +1890,117 @@ function esc(s) {
   var d = document.createElement('div');
   d.textContent = String(s);
   return d.innerHTML;
+}
+
+// ============================================================
+// JS文件搜索功能
+// ============================================================
+
+/**
+ * 过滤JS文件列表
+ */
+function filterJsFiles(query) {
+  const container = document.getElementById('jsFileList');
+  if (!container) return;
+  
+  const items = container.querySelectorAll('.js-file-item');
+  let matchCount = 0;
+  
+  items.forEach(item => {
+    const url = item.getAttribute('data-url') || '';
+    const fileName = url.split('/').pop().split('?')[0].toLowerCase();
+    const searchText = url.toLowerCase();
+    
+    if (!query || searchText.includes(query.toLowerCase()) || fileName.includes(query.toLowerCase())) {
+      item.style.display = '';
+      matchCount++;
+      // 高亮匹配的文本
+      const urlEl = item.querySelector('.js-file-url');
+      if (urlEl && query) {
+        const originalUrl = item.getAttribute('data-url') || '';
+        const regex = new RegExp('(' + escapeRegex(query) + ')', 'gi');
+        urlEl.innerHTML = originalUrl.replace(regex, '<mark>$1</mark>');
+      } else if (urlEl) {
+        urlEl.textContent = item.getAttribute('data-url') || '';
+      }
+    } else {
+      item.style.display = 'none';
+    }
+  });
+  
+  // 显示/隐藏清除按钮
+  document.getElementById('btnClearSearch').style.display = query ? 'block' : 'none';
+  
+  // 显示搜索提示
+  updateSearchHint(query, matchCount, items.length);
+}
+
+/**
+ * 清除搜索
+ */
+function clearFileSearch() {
+  document.getElementById('jsFileSearch').value = '';
+  document.getElementById('btnClearSearch').style.display = 'none';
+  filterJsFiles('');
+}
+
+/**
+ * 更新搜索提示
+ */
+function updateSearchHint(query, matchCount, total) {
+  // 移除已有的提示
+  const existingHint = document.querySelector('.search-hint');
+  if (existingHint) existingHint.remove();
+  
+  if (query && matchCount < total) {
+    const container = document.getElementById('jsFileList');
+    const hint = document.createElement('div');
+    hint.className = 'search-hint';
+    hint.innerHTML = '搜索 "' + esc(query) + '" 匹配 ' + matchCount + '/' + total + ' 个文件 <button class="btn-clear-filter" onclick="clearFileSearch()">清除</button>';
+    container.insertBefore(hint, container.firstChild);
+  }
+}
+
+/**
+ * 转义正则特殊字符
+ */
+function escapeRegex(string) {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// ============================================================
+// 证据展开/收起功能
+// ============================================================
+
+/**
+ * 一键展开所有证据
+ */
+function expandAllEvidence() {
+  document.querySelectorAll('.evidence-cell').forEach(cell => {
+    cell.classList.add('expanded');
+    const btn = cell.querySelector('.evidence-toggle-btn');
+    if (btn) btn.innerHTML = '&#9650; 收起';
+  });
+}
+
+/**
+ * 一键收起所有证据
+ */
+function collapseAllEvidence() {
+  document.querySelectorAll('.evidence-cell').forEach(cell => {
+    cell.classList.remove('expanded');
+    const btn = cell.querySelector('.evidence-toggle-btn');
+    if (btn) btn.innerHTML = '&#9660; 展开';
+  });
+}
+
+/**
+ * 切换单个证据
+ */
+function toggleEvidence(cell, btn) {
+  const isExpanded = cell.classList.contains('expanded');
+  cell.classList.toggle('expanded');
+  btn.innerHTML = isExpanded ? '&#9660; 展开' : '&#9650; 收起';
 }
 
 document.getElementById('targetUrl').addEventListener('keydown', function(e) { 

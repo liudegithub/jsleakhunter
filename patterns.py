@@ -1,8 +1,9 @@
 """
-JSLeakHunter — Detection Patterns v3.2
+JSLeakHunter — Detection Patterns v3.3
 Based on 雪瞳 tool's detection logic - COMPREHENSIVE
 Only ADD, NEVER remove patterns
 Enhanced: More detection patterns for tokens, secrets, crypto keys
+Enhanced: Additional cloud provider and service patterns
 """
 
 import re
@@ -122,9 +123,6 @@ FRAMEWORK_INTERNAL_PATTERNS = [
     r'__webpack_require__',
     r'webpackJsonp',
     r'module\.exports',
-    # Vue.js 内部模式
-    r'keys\s*=\s*["\'][a-zA-Z]+["\']',
-    r'\.call\s*\(\s*this\s*,\s*this\._',
     r'Vue\.component',
     r'Vuex\.Store',
     r'VueRouter',
@@ -373,6 +371,70 @@ PATTERNS = [
     # 36. Consumer Secret
     # ========================================================
     {'pattern': r'consumer[_\-]?secret' + SEP + r'[\'"]?([A-Za-z0-9_\-/+=]{16,})[\'"]?', 'label': 'Consumer Secret', 'severity': 'HIGH', 'confidence': 0.85, 'category': 'secret'},
+    # ========================================================
+    # 37. 微信小程序密钥
+    # ========================================================
+    {'pattern': r'wx[a-z0-9]{16,18}', 'label': 'WeChat Mini Program Key', 'severity': 'HIGH', 'confidence': 0.80, 'category': 'wechat'},
+    # ========================================================
+    # 38. 企业微信密钥
+    # ========================================================
+    {'pattern': r'ww[a-z0-9]{16,18}', 'label': 'Enterprise WeChat Key', 'severity': 'HIGH', 'confidence': 0.80, 'category': 'wechat'},
+    # ========================================================
+    # 39. 阿里云AccessKey (补充)
+    # ========================================================
+    {'pattern': r'LTAI[A-Za-z\d]{12,30}', 'label': 'Alibaba Cloud AccessKey', 'severity': 'HIGH', 'confidence': 0.95, 'category': 'alibaba'},
+    # ========================================================
+    # 40. 腾讯云SecretKey
+    # ========================================================
+    {'pattern': r'AKID[A-Za-z\d]{13,40}', 'label': 'Tencent Cloud SecretKey', 'severity': 'HIGH', 'confidence': 0.95, 'category': 'tencent'},
+    # ========================================================
+    # 41. 京东云密钥
+    # ========================================================
+    {'pattern': r'JDC_[0-9A-Z]{25,40}', 'label': 'JD Cloud Key', 'severity': 'HIGH', 'confidence': 0.95, 'category': 'jd'},
+    # ========================================================
+    # 42. 支付宝密钥
+    # ========================================================
+    {'pattern': r'(?:AKLT|AKTP)[a-zA-Z0-9]{35,50}', 'label': 'Alipay Key', 'severity': 'HIGH', 'confidence': 0.95, 'category': 'alipay'},
+    # ========================================================
+    # 43. Apple开发者密钥
+    # ========================================================
+    {'pattern': r'APID[a-zA-Z0-9]{32,42}', 'label': 'Apple Developer Key', 'severity': 'HIGH', 'confidence': 0.95, 'category': 'apple'},
+    # ========================================================
+    # 44. GitLab Token
+    # ========================================================
+    {'pattern': r'glpat-[a-zA-Z0-9\-=_]{20,22}', 'label': 'GitLab Personal Access Token', 'severity': 'HIGH', 'confidence': 0.95, 'category': 'gitlab'},
+    # ========================================================
+    # 45. Docker Hub Token
+    # ========================================================
+    {'pattern': r'dckr_pat_[a-zA-Z0-9_]{20,}', 'label': 'Docker Hub Token', 'severity': 'HIGH', 'confidence': 0.90, 'category': 'docker'},
+    # ========================================================
+    # 46. NPM Token
+    # ========================================================
+    {'pattern': r'npm_[a-zA-Z0-9]{36}', 'label': 'NPM Token', 'severity': 'HIGH', 'confidence': 0.90, 'category': 'npm'},
+    # ========================================================
+    # 47. Slack Webhook
+    # ========================================================
+    {'pattern': r'https://hooks\.slack\.com/services/T[a-zA-Z0-9_]{8,}/B[a-zA-Z0-9_]{8,}/[a-zA-Z0-9_]{24}', 'label': 'Slack Webhook URL', 'severity': 'HIGH', 'confidence': 0.95, 'category': 'slack'},
+    # ========================================================
+    # 48. Discord Webhook
+    # ========================================================
+    {'pattern': r'https://discord(?:app)?\.com/api/webhooks/\d+/[a-zA-Z0-9_\-]+', 'label': 'Discord Webhook URL', 'severity': 'HIGH', 'confidence': 0.95, 'category': 'discord'},
+    # ========================================================
+    # 49. 微信AppID
+    # ========================================================
+    {'pattern': r'(?:appid|app_id|appId)\s*[:=]\s*["\']?(wx[a-z0-9]{16})["\']?', 'label': 'WeChat AppID', 'severity': 'MEDIUM', 'confidence': 0.80, 'category': 'wechat'},
+    # ========================================================
+    # 50. 高德地图Key
+    # ========================================================
+    {'pattern': r'(?:amap|aMap|amapkey|amapKey|amap_key)[_\-]?(?:key|Key|apikey|ApiKey)\s*[:=]\s*["\']?([a-f0-9]{32})["\']?', 'label': 'AMap Key', 'severity': 'HIGH', 'confidence': 0.85, 'category': 'map'},
+    # ========================================================
+    # 51. 腾讯地图Key
+    # ========================================================
+    {'pattern': r'(?:qqmap|qqMap|qqmapkey|qqMapKey)[_\-]?(?:key|Key|apikey|ApiKey)\s*[:=]\s*["\']?([A-Za-z0-9\-]{20,})["\']?', 'label': 'QQ Map Key', 'severity': 'HIGH', 'confidence': 0.85, 'category': 'map'},
+    # ========================================================
+    # 52. 百度地图Key
+    # ========================================================
+    {'pattern': r'(?:baidumap|baiduMap|baidu_map)[_\-]?(?:key|Key|apikey|ApiKey)\s*[:=]\s*["\']?([A-Za-z0-9]{20,})["\']?', 'label': 'Baidu Map Key', 'severity': 'HIGH', 'confidence': 0.85, 'category': 'map'},
 ]
 
 
