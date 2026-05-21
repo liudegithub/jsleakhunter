@@ -609,28 +609,8 @@ POST /api/history/batch-delete
 - ✅ 优化扫描性能
 - ✅ 新增Markdown报告导出
 
-### v1.0 (2026-01-01)
-
-- 🎉 初始版本发布
-- ✅ 基础JS文件提取
-- ✅ 正则检测
-- ✅ Web界面
-
 ---
 
 ## 📄 许可证
 
 MIT License - 详见 [LICENSE](LICENSE) 文件
-
----
-
-**JSLeakHunter** - 让前端安全检测更简单 🚀 
---- 
-
-## ?? ��л 
-
-����Ŀ����ƹ����вο����������㿪Դ��Ŀ�� 
-
-- [SnowEyes��ѩͫ��](https://github.com/SickleSec/SnowEyes) - ��ҳ������Ϣ��� Chrome ��չ 
-
-��лԭ���� SickleSec �Ŀ�Դ�������������� 
