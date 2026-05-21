@@ -168,6 +168,7 @@ https://www.example.com
 ```
 
 支持格式：
+
 - `https://www.example.com`
 - `http://www.example.com`
 - `www.example.com`（自动添加https）
@@ -176,6 +177,7 @@ https://www.example.com
 #### 步骤2：提取JS文件
 
 点击 **「提取JS文件」** 按钮，系统将：
+
 1. 访问目标页面
 2. 解析HTML中的所有 `<script>` 标签
 3. 列出所有可扫描的JS文件
@@ -183,6 +185,7 @@ https://www.example.com
 #### 步骤3：选择扫描文件
 
 在文件列表中勾选要扫描的JS文件：
+
 - ✅ 勾选单个文件
 - ✅ 全选/取消全选
 - 查看文件大小和类型
@@ -190,6 +193,7 @@ https://www.example.com
 #### 步骤4：开始扫描
 
 点击 **「开始扫描」** 按钮，系统将：
+
 1. 下载JS文件内容
 2. 正则预检敏感信息
 3. AI深度分析（如配置API）
@@ -218,16 +222,19 @@ https://www.example.com
 支持三种格式导出：
 
 #### JSON格式
+
 ```bash
 GET /api/scan/{scan_id}/export/json
 ```
 
 #### CSV格式
+
 ```bash
 GET /api/scan/{scan_id}/export/csv
 ```
 
 #### Markdown格式
+
 ```bash
 GET /api/scan/{scan_id}/export/markdown
 ```
@@ -237,6 +244,7 @@ GET /api/scan/{scan_id}/export/markdown
 ### 四、查看历史记录
 
 访问 **「历史记录」** 页面：
+
 - 查看所有扫描历史
 - 按时间排序
 - 筛选不同状态
@@ -325,11 +333,13 @@ start.bat
 ### Q2: 无法访问目标网站
 
 **可能原因**：
+
 - 目标网站有WAF防护
 - 需要登录Cookie
 - 网络连接问题
 
 **解决方案**：
+
 1. 配置有效的Cookie
 2. 检查网络连接
 3. 降低爬取深度
@@ -339,12 +349,14 @@ start.bat
 ### Q3: AI分析不生效
 
 **检查项**：
+
 - [ ] API密钥是否正确
 - [ ] API地址是否可达
 - [ ] 模型名称是否正确
 - [ ] 网络是否通畅
 
 **测试连接**：
+
 ```bash
 curl -X POST https://api.openai.com/v1/chat/completions \
   -H "Authorization: Bearer YOUR_API_KEY" \
@@ -357,6 +369,7 @@ curl -X POST https://api.openai.com/v1/chat/completions \
 ### Q4: 扫描速度慢
 
 **优化建议**：
+
 1. 减少选择的JS文件数量
 2. 关闭AI分析（不填API密钥）
 3. 降低爬取深度为1
@@ -367,6 +380,7 @@ curl -X POST https://api.openai.com/v1/chat/completions \
 ### Q5: 数据库锁定错误
 
 **解决方案**：
+
 ```bash
 # 删除数据库文件重新创建
 rm data/scans.db
@@ -380,6 +394,7 @@ python app.py
 **修改端口**：
 
 编辑 `app.py` 最后一行：
+
 ```python
 # 修改前
 app.run(host='0.0.0.0', port=5000, debug=False, threaded=True)
@@ -402,6 +417,7 @@ AI配置: (不填，使用纯正则)
 ```
 
 **预期结果**：
+
 - 发现 5-10 个可疑模式
 - 耗时 30-60 秒
 
@@ -418,6 +434,7 @@ API密钥: sk-xxxxx
 ```
 
 **预期结果**：
+
 - AI发现更多语义化问题
 - 耗时 2-5 分钟
 
@@ -426,6 +443,7 @@ API密钥: sk-xxxxx
 ### 示例3：批量扫描多个域名
 
 在目标URL中用逗号分隔：
+
 ```
 https://site1.com,https://site2.com,https://site3.com
 ```
@@ -448,6 +466,7 @@ Content-Type: application/json
 ```
 
 **响应**：
+
 ```json
 {
   "success": true,
@@ -475,6 +494,7 @@ Content-Type: application/json
 ```
 
 **响应**：
+
 ```json
 {
   "scan_id": "abc12345",
@@ -499,6 +519,7 @@ GET /api/scan/{scan_id}/events
 ```
 
 返回SSE事件流：
+
 ```
 data: {"type": "log", "message": "[*] Scanning..."}
 data: {"type": "progress", "value": 50}
@@ -605,11 +626,11 @@ MIT License - 详见 [LICENSE](LICENSE) 文件
 
 **JSLeakHunter** - 让前端安全检测更简单 🚀 
 --- 
- 
-## ?? ��л 
- 
-����Ŀ����ƹ����вο����������㿪Դ��Ŀ�� 
- 
-- [SnowEyes��ѩͫ��](https://github.com/SickleSec/SnowEyes) - ��ҳ������Ϣ��� Chrome ��չ 
- 
-��лԭ���� SickleSec �Ŀ�Դ�������������� 
+
+## ?? ��л 
+
+����Ŀ����ƹ����вο����������㿪Դ��Ŀ�� 
+
+- [SnowEyes��ѩͫ��](https://github.com/SickleSec/SnowEyes) - ��ҳ������Ϣ��� Chrome ��չ 
+
+��лԭ���� SickleSec �Ŀ�Դ�������������� 
